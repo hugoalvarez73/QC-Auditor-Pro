@@ -3,86 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QC Auditor Pro - AI Edition</title>
+    <title>QC Auditor Pro - Channell AI</title>
+    <script type="importmap">
+      { "imports": { "@google/generative-ai": "https://esm.run/@google/generative-ai" } }
+    </script>
     <style>
-        :root { --primary: #004a99; --bg: #F0F7F4; --accent: #76B041; --gold: #ffc107; }
+        :root { --channell-blue: #004a99; --safety-green: #76B041; --gold: #ffc107; --bg: #F0F7F4; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; color: #334155; }
-        .app-container { max-width: 500px; margin: auto; background: white; border-radius: 30px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2f0d9; }
-        .header { background: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; }
+        .app-container { max-width: 500px; margin: auto; background: white; border-radius: 30px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2f0d9; }
+        .header { background: var(--channell-blue); color: white; padding: 20px; text-align: center; border-bottom: 4px solid var(--safety-green); }
         .content { padding: 20px; }
-        .card { background: #f8fafc; padding: 15px; border-radius: 20px; margin-bottom: 15px; border: 1px solid #f1f5f9; }
-        label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 5px; }
-        input, select, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; box-sizing: border-box; font-weight: bold; outline: none; }
-        input:focus { border-color: var(--accent); }
+        .card { background: #f8fafc; padding: 15px; border-radius: 20px; margin-bottom: 15px; border: 1px solid #e2e8f0; }
+        label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; display: block; }
+        input, select, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; box-sizing: border-box; font-weight: bold; }
         .ai-btn { background: var(--gold); color: black; border: none; padding: 15px; border-radius: 15px; font-weight: 900; width: 100%; margin-bottom: 15px; cursor: pointer; box-shadow: 0 4px 0 #d9a406; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .submit-btn { background: var(--accent); color: white; border: none; padding: 18px; border-radius: 15px; font-size: 16px; font-weight: 900; width: 100%; cursor: pointer; box-shadow: 0 4px 0 #5e8d34; }
+        .submit-btn { background: var(--safety-green); color: white; border: none; padding: 18px; border-radius: 15px; font-size: 18px; font-weight: 900; width: 100%; cursor: pointer; box-shadow: 0 4px 0 #5e8d34; }
         .row { display: flex; gap: 10px; }
-        .status-up { background: white; color: var(--accent); border: 2px solid var(--accent); }
-        .status-down { background: white; color: #ef4444; border: 2px solid #ef4444; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div class="header">
-        <h1 style="margin:0; font-size: 18px; font-style: italic;">QC AUDITOR <span style="color:var(--accent)">PRO</span></h1>
-        <select id="dept" style="width: auto; margin:0; padding: 5px; font-size: 10px; background: #E2F0D9; color: #4E7A2A; border:none; border-radius: 20px;">
-            <option>Injection Molding</option><option>Structure Foam</option><option>Fiber</option><option>Metals</option><option>SMC</option>
-        </select>
+        <h1 style="margin:0; font-style: italic;">QC AUDITOR <span style="color:var(--safety-green)">PRO</span></h1>
+        <p style="margin:5px 0 0 0; font-size: 10px; font-weight: bold; opacity: 0.8;">CHANNELL COMMERCIAL CORP</p>
     </div>
 
     <div class="content">
         <div class="row">
-            <div style="flex:2"><label>Auditor Name</label><input type="text" id="name" placeholder="Name"></div>
-            <div style="flex:1"><label>Round</label><input type="number" id="round" value="1"></div>
+            <div style="flex:2"><label>1: Department</label>
+                <select id="dept">
+                    <option>Injection Molding</option><option>Structure Foam</option><option>Blow Mold</option><option>Fiber</option><option>Metals</option><option>SMC</option>
+                </select>
+            </div>
+            <div style="flex:1"><label>3: Shift</label><select id="shift"><option>1st</option><option>2nd</option><option>3rd</option></select></div>
+        </div>
+
+        <div class="row">
+            <div style="flex:2"><label>2: Auditor Name</label><input type="text" id="name" placeholder="Name"></div>
+            <div style="flex:1"><label>4: Round</label><input type="number" id="round" value="1"></div>
         </div>
 
         <div class="card">
-            <label>Inspection Entry</label>
-            <button class="ai-btn" onclick="alert('AI Scanner Triggered: Point camera at Work Order')">📷 AUTO-SCAN REPORT</button>
+            <label>5: Auto Scan</label>
+            <button class="ai-btn" id="aiScanBtn">📷 AUTO-SCAN WORK ORDER</button>
+            <input type="file" id="aiFile" accept="image/*" capture="environment" style="display:none">
             
-            <div class="row">
-                <div style="flex:1"><label>Job # (W/O)</label><input type="text" id="job" placeholder="W/O #"></div>
-                <div style="flex:1"><label>Machine #</label><input type="text" id="machine" placeholder="Tool #"></div>
-            </div>
-
-            <div class="row">
-                <div style="flex:1"><label>Part Name</label><input type="text" id="part" placeholder="Part Name"></div>
-                <div style="flex:1"><label>P/N #</label><input type="text" id="pn" placeholder="Part #"></div>
-            </div>
+            <label>6: Job # (W/O)</label><input type="text" id="job" placeholder="Waiting for scan...">
+            <label>7: Machine / Tool #</label><input type="text" id="machine" placeholder="Machine #">
+            <label>Part Name & P/N</label><input type="text" id="part" placeholder="Part Description">
         </div>
 
-        <label>Tool Status</label>
-        <select id="status">
-            <option value="UP">✅ UP (Running Normal)</option>
-            <option value="DOWN">❌ DOWN (Quality Issue)</option>
-        </select>
+        <label>Status (Up/Down)</label>
+        <select id="status"><option>✅ UP</option><option>❌ DOWN</option></select>
 
-        <label>Capture Damage Photo</label>
+        <label>8: Capture Photo of Damage</label>
         <input type="file" accept="image/*" capture="environment">
 
-        <label>Comments / What Happened?</label>
-        <textarea id="notes" rows="2" placeholder="Explain the defect..."></textarea>
+        <label>9: Comments</label>
+        <textarea id="notes" rows="2" placeholder="What happened?"></textarea>
 
-        <button class="submit-btn" onclick="submitToHugo()">🚀 SUBMIT TO HUGO</button>
+        <button class="submit-btn" onclick="submitAudit()">🚀 SUBMIT & EMAIL HUGO</button>
     </div>
 </div>
 
-<script>
-    // 1. Auto-fill Name from memory
-    document.getElementById('name').value = localStorage.getItem('qc_auditor_name') || '';
-    
-    function submitToHugo() {
-        const name = document.getElementById('name').value;
-        localStorage.setItem('qc_auditor_name', name); // Save name for next time
-        
-        const job = document.getElementById('job').value;
-        const status = document.getElementById('status').value;
-        const notes = document.getElementById('notes').value;
-        
-        const body = `Auditor: ${name}\nStatus: ${status}\nJob: ${job}\nComments: ${notes}`;
-        window.location.href = `mailto:hugoalvarez73@gmail.com?subject=Audit: Job ${job}&body=${encodeURIComponent(body)}`;
+<script type="module">
+    import { GoogleGenerativeAI } from "@google/generative-ai";
+
+    // Set Shift Automatically
+    const hour = new Date().getHours();
+    document.getElementById('shift').value = (hour >= 6 && hour < 14) ? "1st" : (hour >= 14 && hour < 22) ? "2nd" : "3rd";
+
+    // API Key Handling
+    let apiKey = localStorage.getItem('GEMINI_KEY');
+    if (!apiKey) {
+        apiKey = prompt("Please enter your Google Gemini API Key:");
+        if (apiKey) localStorage.setItem('GEMINI_KEY', apiKey);
     }
+
+    const aiBtn = document.getElementById('aiScanBtn');
+    const aiFile = document.getElementById('aiFile');
+
+    aiBtn.onclick = () => aiFile.click();
+
+    aiFile.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !apiKey) return;
+        aiBtn.innerText = "⌛ AI ANALYZING...";
+        
+        try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64Data = reader.result.split(',')[1];
+                const result = await model.generateContent([
+                    "Extract Job Number, Machine Number, and Part Name from this manufacturing report. Return JSON: {job, machine, part}",
+                    { inlineData: { data: base64Data, mimeType: file.type } }
+                ]);
+                const data = JSON.parse((await result.response.text()).replace(/```json|```/g, ''));
+                if(data.job) document.getElementById('job').value = data.job;
+                if(data.machine) document.getElementById('machine').value = data.machine;
+                if(data.part) document.getElementById('part').value = data.part;
+                aiBtn.innerText = "✅ SCAN COMPLETE";
+            };
+            reader.readAsDataURL(file);
+        } catch (err) {
+            alert("AI Error. Check your API key.");
+            aiBtn.innerText = "📷 AUTO-SCAN REPORT";
+        }
+    };
+
+    window.submitAudit = () => {
+        const job = document.getElementById('job').value;
+        const body = `Auditor: ${document.getElementById('name').value}\nJob: ${job}\nStatus: ${document.getElementById('status').value}\nNotes: ${document.getElementById('notes').value}`;
+        window.location.href = `mailto:hugoalvarez73@gmail.com?subject=QC Audit: ${job}&body=${encodeURIComponent(body)}`;
+    };
 </script>
 </body>
 </html>
