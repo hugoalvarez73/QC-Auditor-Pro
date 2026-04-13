@@ -1,0 +1,18 @@
+{
+  "audit_fields": [
+    "Tool Number",
+    "Part Number",
+    "Part Name",
+    "Audit Status",
+    "Defect Notes"
+  ],
+  "departments": {
+    "1300R": "Injection Mold",
+    "1370R": "Structural Foam",
+    "1500R": "Metal Fab (Laser/Brake/Punch)",
+    "1600R": "Powder Coat",
+    "1650R": "Metal Kitting",
+    "1690R": "Welding",
+    "1800R": "Fiber Assembly"
+  }
+}
