@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QC Auditor Pro - Shop Floor</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, select, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .header { text-align: center; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="header">
+        <h2>QC Auditor Pro</h2>
+        <p>Quality Operations Audit</p>
+    </div>
+
+    <label>1. Date</label>
+    <input type="date" id="auditDate">
+
+    <label>2. Shift</label>
+    <select id="shift">
+        <option>1st Shift</option>
+        <option>2nd Shift</option>
+        <option>3rd Shift</option>
+    </select>
+
+    <label>3. Job # / Work Order</label>
+    <input type="text" id="jobNum" placeholder="Scan or Type WO#">
+
+    <label>4. Tool / Machine #</label>
+    <input type="text" id="machineNum" placeholder="e.g. Press 04">
+
+    <label>5. Part Name</label>
+    <input type="text" id="partName" placeholder="e.g. G6 Dome">
+
+    <label>6. P/N (Part Number)</label>
+    <input type="text" id="partNum" placeholder="Scan Part Number">
+
+    <label>7. Tool Status</label>
+    <select id="status">
+        <option value="UP">✅ UP (Running)</option>
+        <option value="DOWN">❌ DOWN (Issues)</option>
+    </select>
+
+    <label>8. Notes / Bad Sample Description</label>
+    <textarea id="notes" rows="3" placeholder="Describe defects here..."></textarea>
+
+    <label>📸 Photo of Bad Sample</label>
+    <input type="file" accept="image/*" capture="environment">
+
+    <button onclick="submitAudit()">SUBMIT AUDIT</button>
+</div>
+
+<script>
+    // Set default date to today
+    document.getElementById('auditDate').valueAsDate = new Date();
+
+    function submitAudit() {
+        alert("Audit Submitted! Hugo will receive the email shortly.");
+        // Logic to trigger the email will go here once you connect your Google Sheet script
+    }
+</script>
+
+</body>
+</html>
