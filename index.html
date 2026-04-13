@@ -5,56 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QC Auditor Pro - AI Edition</title>
     <style>
-        :root { --primary: #004a99; --secondary: #f8f9fa; --accent: #76B041; --gold: #ffc107; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f7f4; margin: 0; padding: 10px; }
-        .app-container { max-width: 500px; margin: auto; background: white; border-radius: 25px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e2f0d9; }
-        .header { background: var(--primary); color: white; padding: 25px 20px; text-align: center; border-bottom: 5px solid var(--accent); }
+        :root { --primary: #004a99; --bg: #F0F7F4; --accent: #76B041; --gold: #ffc107; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; color: #334155; }
+        .app-container { max-width: 500px; margin: auto; background: white; border-radius: 30px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #e2f0d9; }
+        .header { background: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; }
         .content { padding: 20px; }
-        label { font-size: 11px; font-weight: 900; color: #abbac6; text-transform: uppercase; letter-spacing: 1px; margin-left: 5px; }
-        input, select, textarea { width: 100%; padding: 15px; margin: 5px 0 15px 0; border: 2px solid #f0f2f5; border-radius: 15px; font-size: 16px; box-sizing: border-box; background: #f9fbff; font-weight: bold; }
-        .ai-btn { background: var(--gold); color: black; border: none; padding: 15px; border-radius: 15px; font-weight: 900; width: 100%; margin-bottom: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 0 #d9a406; }
-        .submit-btn { background: var(--accent); color: white; border: none; padding: 20px; border-radius: 15px; font-size: 18px; font-weight: 900; width: 100%; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 0 #5e8d34; }
+        .card { background: #f8fafc; padding: 15px; border-radius: 20px; margin-bottom: 15px; border: 1px solid #f1f5f9; }
+        label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 5px; }
+        input, select, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; box-sizing: border-box; font-weight: bold; outline: none; }
+        input:focus { border-color: var(--accent); }
+        .ai-btn { background: var(--gold); color: black; border: none; padding: 15px; border-radius: 15px; font-weight: 900; width: 100%; margin-bottom: 15px; cursor: pointer; box-shadow: 0 4px 0 #d9a406; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .submit-btn { background: var(--accent); color: white; border: none; padding: 18px; border-radius: 15px; font-size: 16px; font-weight: 900; width: 100%; cursor: pointer; box-shadow: 0 4px 0 #5e8d34; }
+        .row { display: flex; gap: 10px; }
+        .status-up { background: white; color: var(--accent); border: 2px solid var(--accent); }
+        .status-down { background: white; color: #ef4444; border: 2px solid #ef4444; }
     </style>
 </head>
 <body>
+
 <div class="app-container">
     <div class="header">
-        <h1 style="margin:0; font-style: italic;">QC AUDITOR <span style="color:var(--accent)">PRO</span></h1>
-        <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 12px; font-weight: bold;">CHANNELL COMMERCIAL CORP</p>
+        <h1 style="margin:0; font-size: 18px; font-style: italic;">QC AUDITOR <span style="color:var(--accent)">PRO</span></h1>
+        <select id="dept" style="width: auto; margin:0; padding: 5px; font-size: 10px; background: #E2F0D9; color: #4E7A2A; border:none; border-radius: 20px;">
+            <option>Injection Molding</option><option>Structure Foam</option><option>Fiber</option><option>Metals</option><option>SMC</option>
+        </select>
     </div>
-    <div class="content">
-        <label>Auditor Name</label>
-        <input type="text" id="name" placeholder="Who is auditing?">
 
-        <label>Department</label>
-        <select id="dept">
-            <option>Injection Molding</option>
-            <option>Fiber</option>
-            <option>Metals</option>
-            <option>SMC</option>
+    <div class="content">
+        <div class="row">
+            <div style="flex:2"><label>Auditor Name</label><input type="text" id="name" placeholder="Name"></div>
+            <div style="flex:1"><label>Round</label><input type="number" id="round" value="1"></div>
+        </div>
+
+        <div class="card">
+            <label>Inspection Entry</label>
+            <button class="ai-btn" onclick="alert('AI Scanner Triggered: Point camera at Work Order')">📷 AUTO-SCAN REPORT</button>
+            
+            <div class="row">
+                <div style="flex:1"><label>Job # (W/O)</label><input type="text" id="job" placeholder="W/O #"></div>
+                <div style="flex:1"><label>Machine #</label><input type="text" id="machine" placeholder="Tool #"></div>
+            </div>
+
+            <div class="row">
+                <div style="flex:1"><label>Part Name</label><input type="text" id="part" placeholder="Part Name"></div>
+                <div style="flex:1"><label>P/N #</label><input type="text" id="pn" placeholder="Part #"></div>
+            </div>
+        </div>
+
+        <label>Tool Status</label>
+        <select id="status">
+            <option value="UP">✅ UP (Running Normal)</option>
+            <option value="DOWN">❌ DOWN (Quality Issue)</option>
         </select>
 
-        <button class="ai-btn" onclick="alert('AI Scanner is ready. Once connected, it will auto-fill the boxes below!')">
-            📷 AUTO-SCAN WORK ORDER
-        </button>
+        <label>Capture Damage Photo</label>
+        <input type="file" accept="image/*" capture="environment">
 
-        <label>Job / Work Order #</label>
-        <input type="text" id="job" placeholder="Scanning will fill this...">
+        <label>Comments / What Happened?</label>
+        <textarea id="notes" rows="2" placeholder="Explain the defect..."></textarea>
 
-        <label>Part Name & P/N</label>
-        <input type="text" id="part" placeholder="e.g. G6 Dome - 12345">
-
-        <button class="submit-btn" onclick="sendEmail()">🚀 SUBMIT & EMAIL HUGO</button>
+        <button class="submit-btn" onclick="submitToHugo()">🚀 SUBMIT TO HUGO</button>
     </div>
 </div>
 
 <script>
-    function sendEmail() {
+    // 1. Auto-fill Name from memory
+    document.getElementById('name').value = localStorage.getItem('qc_auditor_name') || '';
+    
+    function submitToHugo() {
         const name = document.getElementById('name').value;
+        localStorage.setItem('qc_auditor_name', name); // Save name for next time
+        
         const job = document.getElementById('job').value;
-        const dept = document.getElementById('dept').value;
-        const body = `QC Audit Submitted by: ${name}\nDept: ${dept}\nJob #: ${job}\n\nSent from QC Auditor Pro`;
-        window.location.href = `mailto:hugoalvarez73@gmail.com?subject=QC Audit: Job ${job}&body=${encodeURIComponent(body)}`;
+        const status = document.getElementById('status').value;
+        const notes = document.getElementById('notes').value;
+        
+        const body = `Auditor: ${name}\nStatus: ${status}\nJob: ${job}\nComments: ${notes}`;
+        window.location.href = `mailto:hugoalvarez73@gmail.com?subject=Audit: Job ${job}&body=${encodeURIComponent(body)}`;
     }
 </script>
 </body>
