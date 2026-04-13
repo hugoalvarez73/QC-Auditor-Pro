@@ -1,124 +1,484 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QC Auditor Pro - Channell AI</title>
-    <script type="importmap">
-      { "imports": { "@google/generative-ai": "https://esm.run/@google/generative-ai" } }
-    </script>
-    <style>
-        :root { --channell-blue: #004a99; --safety-green: #76B041; --gold: #ffc107; --bg: #F0F7F4; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; color: #334155; }
-        .app-container { max-width: 500px; margin: auto; background: white; border-radius: 30px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2f0d9; }
-        .header { background: var(--channell-blue); color: white; padding: 20px; text-align: center; border-bottom: 4px solid var(--safety-green); }
-        .content { padding: 20px; }
-        .card { background: #f8fafc; padding: 15px; border-radius: 20px; margin-bottom: 15px; border: 1px solid #e2e8f0; }
-        label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; display: block; }
-        input, select, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; box-sizing: border-box; font-weight: bold; }
-        .ai-btn { background: var(--gold); color: black; border: none; padding: 15px; border-radius: 15px; font-weight: 900; width: 100%; margin-bottom: 15px; cursor: pointer; box-shadow: 0 4px 0 #d9a406; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .submit-btn { background: var(--safety-green); color: white; border: none; padding: 18px; border-radius: 15px; font-size: 18px; font-weight: 900; width: 100%; cursor: pointer; box-shadow: 0 4px 0 #5e8d34; }
-        .row { display: flex; gap: 10px; }
-    </style>
-</head>
-<body>
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Camera, Send, Plus, Trash2, CheckCircle, ClipboardList, 
+  ChevronDown, X, RefreshCw, Clock, Image as ImageIcon
+} from 'lucide-react';
+import { GoogleGenAI, Type } from "@google/genai";
 
-<div class="app-container">
-    <div class="header">
-        <h1 style="margin:0; font-style: italic;">QC AUDITOR <span style="color:var(--safety-green)">PRO</span></h1>
-        <p style="margin:5px 0 0 0; font-size: 10px; font-weight: bold; opacity: 0.8;">CHANNELL COMMERCIAL CORP</p>
-    </div>
+// --- STABLE CONNECTIONS ---
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbziSA4p77fyExThpxYr8XU92Xencvz_MVEp6PqL5e4gPG8pY766pUIoji890D9WEbO3/exec';
+const SPREADSHEET_ID = '1wQzPMNyIKaoRyY3P8SMKhaahHBZDAFf8PPbWoaac4fA';
+const DEPARTMENTS = ['Injection Molding', 'Structure Foam', 'Blow Mold', 'Fiber', 'Metals', 'SMC'];
+const SHIFTS = ['1st Shift', '2nd Shift', '3rd Shift'];
 
-    <div class="content">
-        <div class="row">
-            <div style="flex:2"><label>1: Department</label>
-                <select id="dept">
-                    <option>Injection Molding</option><option>Structure Foam</option><option>Blow Mold</option><option>Fiber</option><option>Metals</option><option>SMC</option>
-                </select>
-            </div>
-            <div style="flex:1"><label>3: Shift</label><select id="shift"><option>1st</option><option>2nd</option><option>3rd</option></select></div>
-        </div>
+const getInitialDailyScanCount = (): number => {
+  const today = new Date().toLocaleDateString();
+  const storedDate = localStorage.getItem('scanDate');
+  const storedCount = localStorage.getItem('dailyScanCount');
 
-        <div class="row">
-            <div style="flex:2"><label>2: Auditor Name</label><input type="text" id="name" placeholder="Name"></div>
-            <div style="flex:1"><label>4: Round</label><input type="number" id="round" value="1"></div>
-        </div>
+  if (storedDate === today && storedCount) {
+    return parseInt(storedCount, 10);
+  } else {
+    localStorage.setItem('scanDate', today);
+    localStorage.setItem('dailyScanCount', '0');
+    return 0;
+  }
+};
 
-        <div class="card">
-            <label>5: Auto Scan</label>
-            <button class="ai-btn" id="aiScanBtn">📷 AUTO-SCAN WORK ORDER</button>
-            <input type="file" id="aiFile" accept="image/*" capture="environment" style="display:none">
-            
-            <label>6: Job # (W/O)</label><input type="text" id="job" placeholder="Waiting for scan...">
-            <label>7: Machine / Tool #</label><input type="text" id="machine" placeholder="Machine #">
-            <label>Part Name & P/N</label><input type="text" id="part" placeholder="Part Description">
-        </div>
+const photoCompression = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 1024;
+        let width = img.width;
+        let height = img.height;
 
-        <label>Status (Up/Down)</label>
-        <select id="status"><option>✅ UP</option><option>❌ DOWN</option></select>
+        if (width > maxWidth) {
+          height = (maxWidth / width) * height;
+          width = maxWidth;
+        }
 
-        <label>8: Capture Photo of Damage</label>
-        <input type="file" accept="image/*" capture="environment">
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Could not get canvas context'));
+        }
+        ctx.drawImage(img, 0, 0, width, height);
 
-        <label>9: Comments</label>
-        <textarea id="notes" rows="2" placeholder="What happened?"></textarea>
+        // Returning base64 directly to match existing app logic seamlessly
+        const base64String = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(base64String);
+      };
+      img.onerror = reject;
+      if (event.target?.result) {
+        img.src = event.target.result as string;
+      } else {
+        reject(new Error('FileReader error'));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
-        <button class="submit-btn" onclick="submitAudit()">🚀 SUBMIT & EMAIL HUGO</button>
-    </div>
-</div>
+export default function App() {
+  const [department, setDepartment] = useState('Structure Foam');
+  const [shift, setShift] = useState('1st Shift');
+  const [round, setRound] = useState('1');
+  const [auditorName, setAuditorName] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [history, setHistory] = useState<any[]>([]);
+  const [sessionInspections, setSessionInspections] = useState<any[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [status, setStatus] = useState({ type: '', message: '' });
+  const [dailyScanCount, setDailyScanCount] = useState<number>(getInitialDailyScanCount());
+  
+  const [currentOrder, setCurrentOrder] = useState({ 
+    WorkNumber: '', partNumber: '', partName: '', toolNumber: '', status: 'Up', issue: '', photo: '' 
+  });
 
-<script type="module">
-    import { GoogleGenerativeAI } from "@google/generative-ai";
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-    // Set Shift Automatically
-    const hour = new Date().getHours();
-    document.getElementById('shift').value = (hour >= 6 && hour < 14) ? "1st" : (hour >= 14 && hour < 22) ? "2nd" : "3rd";
+  // --- 24-HOUR TIMESTAMP LOGIC ---
+  const get24HourTime = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const getFullDate = () => new Date().toLocaleDateString('en-US');
 
-    // API Key Handling
-    let apiKey = localStorage.getItem('GEMINI_KEY');
-    if (!apiKey) {
-        apiKey = prompt("Please enter your Google Gemini API Key:");
-        if (apiKey) localStorage.setItem('GEMINI_KEY', apiKey);
+  // --- SMART SHIFT & AUTO-SAVE LOGIC ---
+  useEffect(() => {
+    // Smart Shift
+    const determineShift = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const timeInMinutes = hours * 60 + minutes;
+
+      if (timeInMinutes >= 360 && timeInMinutes < 870) { // 6:00 AM - 2:30 PM
+        setShift('1st Shift');
+      } else if (timeInMinutes >= 870 && timeInMinutes < 1350) { // 2:30 PM - 10:30 PM
+        setShift('2nd Shift');
+      } else { // 10:30 PM - 6:00 AM
+        setShift('3rd Shift');
+      }
+    };
+    determineShift();
+
+    // Auto-load Auditor Name
+    const savedName = localStorage.getItem('auditorName');
+    if (savedName) {
+      setAuditorName(savedName);
+    }
+    const savedEmail = localStorage.getItem('recipientEmail');
+    if (savedEmail) {
+      setRecipientEmail(savedEmail);
+    }
+  }, []);
+
+  const handleAuditorNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setAuditorName(newName);
+    localStorage.setItem('auditorName', newName);
+  };
+
+  const handleRecipientEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setRecipientEmail(newEmail);
+    localStorage.setItem('recipientEmail', newEmail);
+  };
+
+  // --- AI SCANNING (SPECIFIC TO DISCRETE JOB ROUTING REPORT) ---
+  const processImage = async (base64Image: string) => {
+    if (!auditorName) {
+      setStatus({ type: 'error', message: 'Please enter Auditor Name before scanning!' });
+      return;
+    }
+    setIsScanning(true);
+    setStatus({ type: 'info', message: 'AI Analyzing Report...' });
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const [header, base64Data] = base64Image.split(',');
+      const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: [{ 
+          parts: [
+            { inlineData: { data: base64Data, mimeType } }, 
+            { text: "Extract manufacturing details from this report image. This is a 'Discrete Job Routing' or 'Work Order' report. \n\nCRITICAL: Find the Work Order / Job Number. It is often labeled as 'Job:', 'Work Order:', 'W.O.#', 'Job No:', or 'Discrete Job'. It is usually a 7-10 digit number.\n\nAlso extract:\n1. Part/Spec Number (e.g., 'Assy:', 'Spec Num:', 'Part No', 'Item Number')\n2. Part Description (e.g., 'Assy Desc:', 'Description', 'Part Name')\n3. Tool/Machine Number (e.g., 'Sched Group:', 'Tool:', 'Machine #', 'Resource')\n\nIf a field is not found, return an empty string. Return the data in clean JSON." }
+          ]
+        }],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              WorkNumber: { type: Type.STRING, description: "The Work Number (e.g. 1234567)" },
+              partNumber: { type: Type.STRING, description: "The Part or Spec number" },
+              partName: { type: Type.STRING, description: "The Part Description or Name" },
+              toolNumber: { type: Type.STRING, description: "The Tool or Machine number" }
+            }
+          }
+        }
+      });
+      
+      console.log("AI Response:", response);
+      const text = response.text || '{}';
+      const data = JSON.parse(text);
+      const timeStamp = get24HourTime();
+      const dateStamp = getFullDate();
+
+      // Update the screen boxes (AUTO-POPULATION)
+      const updatedOrder = { 
+        ...currentOrder, 
+        WorkNumber: data.WorkNumber || '',
+        partNumber: data.partNumber || '',
+        partName: data.partName || '',
+        toolNumber: data.toolNumber || ''
+      };
+      setCurrentOrder(updatedOrder);
+      
+      setDailyScanCount(prevCount => {
+        const newCount = prevCount + 1;
+        localStorage.setItem('dailyScanCount', newCount.toString());
+        localStorage.setItem('scanDate', new Date().toLocaleDateString());
+        return newCount;
+      });
+
+      setStatus({ type: 'success', message: 'Auto-Populated! Please verify and press Submit.' });
+    } catch (err) { 
+      console.error("AI Scan Error:", err);
+      setStatus({ type: 'error', message: 'AI could not read report. Please enter manually.' }); 
+    } finally { 
+      setIsScanning(false); 
+      setTimeout(() => setStatus({type:'', message:''}), 5000); 
+    }
+  };
+
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setStatus({ type: 'info', message: 'Compressing image...' });
+        const compressedBase64 = await photoCompression(file);
+        processImage(compressedBase64);
+      } catch (error) {
+        console.error("Compression error:", error);
+        setStatus({ type: 'error', message: 'Image compression failed.' });
+      }
+    }
+  };
+
+  const onPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setStatus({ type: 'info', message: 'Compressing photo...' });
+        const compressedBase64 = await photoCompression(file);
+        setCurrentOrder(prev => ({ ...prev, photo: compressedBase64 }));
+        setStatus({ type: 'success', message: 'Defect Photo Attached!' });
+        setTimeout(() => setStatus({type:'', message:''}), 2000);
+      } catch (error) {
+        console.error("Compression error:", error);
+        setStatus({ type: 'error', message: 'Photo compression failed.' });
+      }
+    }
+  };
+
+  const addToRound = (autoSubmit = false) => {
+    if (!auditorName) {
+      setStatus({ type: 'error', message: 'Please enter Auditor Name first!' });
+      return;
+    }
+    if (!currentOrder.WorkNumber || !currentOrder.toolNumber) {
+      setStatus({ type: 'error', message: 'Missing Job or Tool Number' });
+      return;
+    }
+    const timeStamp = get24HourTime();
+    const dateStamp = getFullDate();
+    const newInspection = {
+      ...currentOrder,
+      id: Math.random().toString(36).substr(2, 9),
+      time: timeStamp,
+      date: dateStamp
+    };
+    
+    const updatedRound = [...sessionInspections, newInspection];
+    setSessionInspections(updatedRound);
+    setCurrentOrder({ WorkNumber: '', partNumber: '', partName: '', toolNumber: '', status: 'Up', issue: '', photo: '' });
+    
+    if (autoSubmit) {
+      submitRound(updatedRound);
+    } else {
+      setStatus({ type: 'success', message: 'Added to Round!' });
+      setTimeout(() => setStatus({ type: '', message: '' }), 2000);
+    }
+  };
+
+  const removeFromRound = (id: string) => {
+    setSessionInspections(sessionInspections.filter(insp => insp.id !== id));
+  };
+
+  const submitRound = async (inspectionsToSubmit = sessionInspections) => {
+    if (inspectionsToSubmit.length === 0) {
+      setStatus({ type: 'error', message: 'No inspections to submit' });
+      return;
     }
 
-    const aiBtn = document.getElementById('aiScanBtn');
-    const aiFile = document.getElementById('aiFile');
+    setStatus({ type: 'info', message: `Syncing ${inspectionsToSubmit.length} entries...` });
 
-    aiBtn.onclick = () => aiFile.click();
+    try {
+      for (const inspection of inspectionsToSubmit) {
+        const payload = {
+          spreadsheetId: SPREADSHEET_ID,
+          "Timestamp": `${inspection.date} ${inspection.time}`,
+          "Auditor Name": auditorName,
+          "Shift": shift,
+          "Department": department,
+          "Round": round,
+          "Work Order #": inspection.WorkNumber,
+          "Part Number": inspection.partNumber,
+          "Part Name": inspection.partName,
+          "Tool Number": inspection.toolNumber,
+          "Status": inspection.status,
+          "Issue": inspection.issue,
+        };
 
-    aiFile.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file || !apiKey) return;
-        aiBtn.innerText = "⌛ AI ANALYZING...";
+        const response = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
         
-        try {
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64Data = reader.result.split(',')[1];
-                const result = await model.generateContent([
-                    "Extract Job Number, Machine Number, and Part Name from this manufacturing report. Return JSON: {job, machine, part}",
-                    { inlineData: { data: base64Data, mimeType: file.type } }
-                ]);
-                const data = JSON.parse((await result.response.text()).replace(/```json|```/g, ''));
-                if(data.job) document.getElementById('job').value = data.job;
-                if(data.machine) document.getElementById('machine').value = data.machine;
-                if(data.part) document.getElementById('part').value = data.part;
-                aiBtn.innerText = "✅ SCAN COMPLETE";
-            };
-            reader.readAsDataURL(file);
-        } catch (err) {
-            alert("AI Error. Check your API key.");
-            aiBtn.innerText = "📷 AUTO-SCAN REPORT";
-        }
-    };
+        if (!response.ok) throw new Error("Network response was not ok");
+      }
 
-    window.submitAudit = () => {
-        const job = document.getElementById('job').value;
-        const body = `Auditor: ${document.getElementById('name').value}\nJob: ${job}\nStatus: ${document.getElementById('status').value}\nNotes: ${document.getElementById('notes').value}`;
-        window.location.href = `mailto:hugoalvarez73@gmail.com?subject=QC Audit: ${job}&body=${encodeURIComponent(body)}`;
-    };
-</script>
-</body>
-</html>
+      setStatus({ type: 'success', message: 'Sync Complete!' });
+      setHistory([...inspectionsToSubmit, ...history].slice(0, 10));
+      setSessionInspections([]);
+      
+    } catch (err) {
+      console.error("Sync Error:", err);
+      setStatus({ type: 'error', message: 'Sync Failed. Check Connection.' }); 
+    }
+
+    setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+  };
+
+  const sendEmailReport = () => {
+    if (!recipientEmail) {
+      setStatus({ type: 'error', message: 'Please enter recipient email!' });
+      return;
+    }
+    if (sessionInspections.length === 0) {
+      setStatus({ type: 'error', message: 'No inspections in current round to email' });
+      return;
+    }
+
+    const subject = `QC Audit Report - ${department} - Round ${round} - ${getFullDate()}`;
+    const summary = sessionInspections.map(insp => 
+      `[${insp.time}] JOB: ${insp.WorkNumber} | TOOL: ${insp.toolNumber} | STATUS: ${insp.status}${insp.issue ? ` | ISSUE: ${insp.issue}` : ''}`
+    ).join('\n\n');
+
+    const body = `QC AUDIT REPORT\nDepartment: ${department}\nShift: ${shift}\nRound: ${round}\nAuditor: ${auditorName}\nDate: ${getFullDate()}\n\nINSPECTIONS:\n\n${summary}\n\nGenerated by QC Auditor Pro`;
+
+    const mailtoUrl = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoUrl;
+    setStatus({ type: 'success', message: 'Email Client Opened!' });
+    setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F0F7F4] font-sans text-slate-900 pb-24">
+      <input type="file" accept="image/*" capture="environment" ref={fileInputRef} className="hidden" onChange={onFileChange} />
+      <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={onPhotoChange} />
+
+      <header className="bg-white border-b p-4 sticky top-0 z-50 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="bg-[#E2F0D9] p-2 rounded-lg"><ClipboardList className="text-[#76B041]"/></div>
+          <h1 className="text-lg font-black italic">QC AUDITOR <span className="text-[#76B041]">PRO</span></h1>
+        </div>
+        <select value={department} onChange={e=>setDepartment(e.target.value)} className="bg-[#E2F0D9] text-[#4E7A2A] px-3 py-1 rounded-full text-[10px] font-black outline-none border border-[#C5E0B4]">
+          {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+        </select>
+      </header>
+
+      <main className="max-w-4xl mx-auto p-4 space-y-4">
+        <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input value={auditorName} onChange={handleAuditorNameChange} placeholder="Auditor Name" className="text-sm font-bold p-3 bg-slate-50 rounded-xl outline-none" />
+          <input value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Recipient Email" className="text-sm font-bold p-3 bg-slate-50 rounded-xl outline-none" />
+          <select value={shift} onChange={e=>setShift(e.target.value)} className="text-xs font-bold p-3 bg-slate-50 rounded-xl outline-none">
+            {SHIFTS.map(s => <option key={s}>{s}</option>)}
+          </select>
+          <div className="flex items-center bg-slate-50 rounded-xl px-3">
+            <span className="text-[10px] font-black opacity-30 mr-2 uppercase">Round</span>
+            <input type="number" value={round} onChange={e=>setRound(e.target.value)} className="bg-transparent font-black w-full outline-none text-[#76B041]" />
+          </div>
+        </section>
+
+        <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Inspection Entry</h2>
+              <div className="flex gap-2">
+                <button onClick={() => setCurrentOrder({ WorkNumber: '', partNumber: '', partName: '', toolNumber: '', status: 'Up', issue: '', photo: '' })} className="bg-slate-100 text-slate-400 px-4 py-2.5 rounded-full font-black text-[10px] flex items-center gap-2">
+                  <RefreshCw className="w-3 h-3"/> CLEAR
+                </button>
+                <button onClick={() => fileInputRef.current?.click()} className="bg-[#76B041] text-white px-5 py-2.5 rounded-full font-black text-[10px] flex items-center gap-2 shadow-md">
+                  {isScanning ? <RefreshCw className="animate-spin w-4 h-4"/> : <Camera className="w-4 h-4"/>}
+                  {isScanning ? 'AI SCANNING...' : 'AUTO-SCAN REPORT'}
+                </button>
+              </div>
+            </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black opacity-20 ml-2">JOB #</label>
+              <input value={currentOrder.WorkNumber} onChange={e=>setCurrentOrder({...currentOrder, WorkNumber: e.target.value})} className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-lg focus:border-[#76B041] outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black opacity-20 ml-2">TOOL / MACHINE #</label>
+              <input value={currentOrder.toolNumber} onChange={e=>setCurrentOrder({...currentOrder, toolNumber: e.target.value})} className="w-full p-5 bg-[#F9FFF5] border-2 border-[#E2F0D9] rounded-2xl font-black text-lg text-[#4E7A2A] outline-none" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+             <div className="space-y-1">
+              <label className="text-[10px] font-black opacity-20 ml-2 uppercase">Part / Spec Num.</label>
+              <input value={currentOrder.partNumber} onChange={e=>setCurrentOrder({...currentOrder, partNumber: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl outline-none font-bold text-[10px]" />
+             </div>
+             <div className="space-y-1">
+              <label className="text-[10px] font-black opacity-20 ml-2 uppercase">Part Description</label>
+              <input value={currentOrder.partName} onChange={e=>setCurrentOrder({...currentOrder, partName: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl outline-none font-bold text-[10px]" />
+             </div>
+          </div>
+
+          <div className="flex gap-2 bg-slate-100 p-1 rounded-2xl">
+            {['Up', 'Down', 'Mold Change'].map(s => (
+              <button key={s} onClick={()=>setCurrentOrder({...currentOrder, status: s})} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase ${currentOrder.status === s ? 'bg-white shadow text-[#76B041]' : 'text-slate-400'}`}>{s}</button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button 
+              onClick={() => photoInputRef.current?.click()} 
+              className={`p-4 border-2 border-dashed rounded-2xl font-black text-[10px] flex items-center justify-center gap-2 transition-all ${currentOrder.photo ? 'bg-[#E2F0D9] border-[#76B041] text-[#4E7A2A]' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+            >
+              <ImageIcon className="w-4 h-4"/> 
+              {currentOrder.photo ? 'PHOTO ATTACHED' : 'CAPTURE DEFECT PHOTO'}
+            </button>
+            <textarea placeholder="Defects or Quality Issues..." value={currentOrder.issue} onChange={e=>setCurrentOrder({...currentOrder, issue: e.target.value})} className="p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl h-24 outline-none text-xs font-bold" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button onClick={() => addToRound(false)} className="w-full bg-[#76B041] text-white p-6 rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-lg hover:bg-[#659a35] transition-colors">
+              <Plus className="w-6 h-6"/> ADD TO ROUND
+            </button>
+            <button onClick={() => addToRound(true)} className="w-full bg-slate-100 text-slate-600 p-6 rounded-2xl font-black text-lg flex items-center justify-center gap-3 border-2 border-slate-200 hover:bg-slate-200 transition-colors">
+              <Send className="w-6 h-6"/> SUBMIT NOW
+            </button>
+          </div>
+        </section>
+
+        {sessionInspections.length > 0 && (
+          <section className="bg-white p-6 rounded-[2.5rem] shadow-xl border-2 border-[#E2F0D9] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex justify-between items-center px-2">
+              <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-[#76B041]"/> Current Round Progress ({sessionInspections.length})
+              </h2>
+              <button onClick={() => setSessionInspections([])} className="text-[10px] font-black text-red-400 hover:text-red-600 uppercase">Clear All</button>
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+              {sessionInspections.map((insp) => (
+                <div key={insp.id} className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center text-sm font-bold border border-slate-100 group">
+                  <div className="flex items-center gap-4">
+                    <span className="text-[10px] text-slate-300 font-mono">{insp.time}</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs">JOB {insp.WorkNumber}</span>
+                      <span className="text-[9px] opacity-40 uppercase">Tool {insp.toolNumber}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${insp.status === 'Up' ? 'bg-[#E2F0D9] text-[#4E7A2A]' : insp.status === 'Down' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                      {insp.status}
+                    </span>
+                    <button onClick={() => removeFromRound(insp.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                      <Trash2 className="w-4 h-4"/>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button onClick={() => submitRound()} className="w-full bg-slate-900 text-white p-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl hover:bg-black transition-all">
+                <Send className="w-5 h-5"/> SYNC TO SHEET
+              </button>
+              <button onClick={sendEmailReport} className="w-full bg-[#E2F0D9] text-[#4E7A2A] p-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 border-2 border-[#C5E0B4] hover:bg-[#d4e9c3] transition-all">
+                <ImageIcon className="w-5 h-5"/> EMAIL REPORT
+              </button>
+            </div>
+          </section>
+        )}
+
+        {status.message && <div className="p-4 bg-white rounded-2xl text-[#76B041] font-black text-center border border-[#E2F0D9] animate-pulse uppercase text-[10px]">{status.message}</div>}
+
+        <div className="pt-6 border-t">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 mb-4 flex items-center gap-2 opacity-50"><Clock className="w-3 h-3"/> Last 10 Activities (24hr Clock)</h3>
+          {history.map((h, i) => (
+            <div key={i} className="bg-white/50 p-3 rounded-xl border border-dashed mb-2 flex justify-between text-[9px] font-bold opacity-40">
+              <span>{h.time} - JOB {h.WorkNumber} (TOOL {h.toolNumber})</span>
+              <span className="text-[#76B041]">{h.status.toUpperCase()}</span>
+            </div>
+          ))}
+        </div>
+      </main>
+
+      <div className="fixed bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-xl shadow-lg border border-slate-200 z-50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+        Daily AI Scans: <span className={dailyScanCount >= 250 ? 'text-red-500' : 'text-[#76B041]'}>{dailyScanCount}</span> / 250
+      </div>
+    </div>
+  );
+}
+
+
