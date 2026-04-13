@@ -3,63 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QC Auditor Pro - Mobile</title>
+    <title>QC Auditor Pro - AI Edition</title>
     <style>
-        :root { --primary: #004a99; --secondary: #f8f9fa; --accent: #ffc107; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #e9ecef; margin: 0; padding: 15px; }
-        .app-container { max-width: 500px; margin: auto; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .header { background: var(--primary); color: white; padding: 20px; text-align: center; }
+        :root { --primary: #004a99; --secondary: #f8f9fa; --accent: #76B041; --gold: #ffc107; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f7f4; margin: 0; padding: 10px; }
+        .app-container { max-width: 500px; margin: auto; background: white; border-radius: 25px; overflow: hidden; shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e2f0d9; }
+        .header { background: var(--primary); color: white; padding: 25px 20px; text-align: center; border-bottom: 5px solid var(--accent); }
         .content { padding: 20px; }
-        .input-group { margin-bottom: 15px; }
-        label { font-weight: bold; color: #333; display: block; margin-bottom: 5px; }
-        input, select, textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        .scan-btn { background: var(--accent); color: black; border: none; padding: 10px; border-radius: 8px; font-weight: bold; margin-bottom: 10px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .submit-btn { background: #28a745; color: white; border: none; padding: 18px; border-radius: 8px; font-size: 18px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
+        label { font-size: 11px; font-weight: 900; color: #abbac6; text-transform: uppercase; letter-spacing: 1px; margin-left: 5px; }
+        input, select, textarea { width: 100%; padding: 15px; margin: 5px 0 15px 0; border: 2px solid #f0f2f5; border-radius: 15px; font-size: 16px; box-sizing: border-box; background: #f9fbff; font-weight: bold; }
+        .ai-btn { background: var(--gold); color: black; border: none; padding: 15px; border-radius: 15px; font-weight: 900; width: 100%; margin-bottom: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 0 #d9a406; transition: 0.2s; }
+        .ai-btn:active { transform: translateY(3px); box-shadow: none; }
+        .submit-btn { background: var(--accent); color: white; border: none; padding: 20px; border-radius: 15px; font-size: 18px; font-weight: 900; width: 100%; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 0 #5e8d34; }
+        .status-badge { background: #e2f0d9; color: #4e7a2a; padding: 4px 10px; border-radius: 10px; font-size: 10px; float: right; }
     </style>
 </head>
 <body>
+
 <div class="app-container">
     <div class="header">
-        <h1>QC Auditor Pro</h1>
-        <p>Channell Commercial Corp - Quality Dept</p>
+        <h1 style="margin:0; font-style: italic; letter-spacing: -1px;">QC AUDITOR <span style="color:var(--accent)">PRO</span></h1>
+        <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 12px; font-weight: bold;">CHANNELL COMMERCIAL CORP</p>
     </div>
+
     <div class="content">
-        <div class="input-group">
-            <label>Date & Shift</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="date" id="date">
+        <button class="ai-btn" onclick="alert('AI Scanner is warming up...')">
+            📷 AUTO-SCAN WORK ORDER
+        </button>
+
+        <label>Job / Work Order # <span class="status-badge">AI Target</span></label>
+        <input type="text" id="job" placeholder="Scan or type WO#">
+
+        <label>Machine / Tool #</label>
+        <input type="text" id="machine" placeholder="e.g. Press 04">
+
+        <div style="display: flex; gap: 10px;">
+            <div style="flex:1">
+                <label>Shift</label>
                 <select id="shift"><option>1st</option><option>2nd</option><option>3rd</option></select>
             </div>
+            <div style="flex:1">
+                <label>Status</label>
+                <select id="status"><option>✅ UP</option><option>❌ DOWN</option></select>
+            </div>
         </div>
-        <div class="input-group">
-            <label>Work Order / Job #</label>
-            <button class="scan-btn">📷 SCAN BARCODE</button>
-            <input type="text" id="job" placeholder="Scan or type WO#">
-        </div>
-        <div class="input-group">
-            <label>Machine / Press #</label>
-            <input type="text" id="machine" placeholder="e.g. Press 04">
-        </div>
-        <div class="input-group">
-            <label>Part Information</label>
-            <input type="text" id="partName" placeholder="Part Name (e.g. G6 Dome)">
-            <input type="text" id="partNum" placeholder="Part Number (P/N)" style="margin-top: 5px;">
-        </div>
-        <div class="input-group">
-            <label>Tool Status</label>
-            <select id="status" style="border-left: 10px solid #28a745;">
-                <option value="UP">✅ UP - Running Normal</option>
-                <option value="DOWN">❌ DOWN - Defect Found</option>
-            </select>
-        </div>
-        <div class="input-group">
-            <label>Defect Notes & Photos</label>
-            <textarea id="notes" rows="2" placeholder="Explain issues here..."></textarea>
-            <input type="file" accept="image/*" capture="environment" style="margin-top: 5px; border: none;">
-        </div>
-        <button class="submit-btn" onclick="alert('Sending to Hugo...')">🚀 SUBMIT TO QUALITY DEPT</button>
+
+        <label>Part Description</label>
+        <input type="text" id="partName" placeholder="e.g. G6 Dome">
+
+        <label>Defect Notes & Photo</label>
+        <textarea id="notes" rows="2" placeholder="Describe any issues..."></textarea>
+        <input type="file" accept="image/*" capture="environment" style="border:none; background:transparent; padding:0;">
+
+        <button class="submit-btn">🚀 SUBMIT TO HUGO</button>
     </div>
 </div>
-<script>document.getElementById('date').valueAsDate = new Date();</script>
+
+<script>
+    // Logic for auto-filling date or future AI connections goes here
+</script>
 </body>
 </html>
