@@ -3,70 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QC Auditor Pro - Shop Floor</title>
+    <title>QC Auditor Pro - Mobile</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        input, select, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .header { text-align: center; margin-bottom: 20px; }
+        :root { --primary: #004a99; --secondary: #f8f9fa; --accent: #ffc107; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #e9ecef; margin: 0; padding: 15px; }
+        .app-container { max-width: 500px; margin: auto; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .header { background: var(--primary); color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; }
+        .input-group { margin-bottom: 15px; }
+        label { font-weight: bold; color: #333; display: block; margin-bottom: 5px; }
+        input, select, textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        .scan-btn { background: var(--accent); color: black; border: none; padding: 10px; border-radius: 8px; font-weight: bold; margin-bottom: 10px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .submit-btn { background: #28a745; color: white; border: none; padding: 18px; border-radius: 8px; font-size: 18px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
-
-<div class="card">
+<div class="app-container">
     <div class="header">
-        <h2>QC Auditor Pro</h2>
-        <p>Quality Operations Audit</p>
+        <h1>QC Auditor Pro</h1>
+        <p>Channell Commercial Corp - Quality Dept</p>
     </div>
-
-    <label>1. Date</label>
-    <input type="date" id="auditDate">
-
-    <label>2. Shift</label>
-    <select id="shift">
-        <option>1st Shift</option>
-        <option>2nd Shift</option>
-        <option>3rd Shift</option>
-    </select>
-
-    <label>3. Job # / Work Order</label>
-    <input type="text" id="jobNum" placeholder="Scan or Type WO#">
-
-    <label>4. Tool / Machine #</label>
-    <input type="text" id="machineNum" placeholder="e.g. Press 04">
-
-    <label>5. Part Name</label>
-    <input type="text" id="partName" placeholder="e.g. G6 Dome">
-
-    <label>6. P/N (Part Number)</label>
-    <input type="text" id="partNum" placeholder="Scan Part Number">
-
-    <label>7. Tool Status</label>
-    <select id="status">
-        <option value="UP">✅ UP (Running)</option>
-        <option value="DOWN">❌ DOWN (Issues)</option>
-    </select>
-
-    <label>8. Notes / Bad Sample Description</label>
-    <textarea id="notes" rows="3" placeholder="Describe defects here..."></textarea>
-
-    <label>📸 Photo of Bad Sample</label>
-    <input type="file" accept="image/*" capture="environment">
-
-    <button onclick="submitAudit()">SUBMIT AUDIT</button>
+    <div class="content">
+        <div class="input-group">
+            <label>Date & Shift</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="date" id="date">
+                <select id="shift"><option>1st</option><option>2nd</option><option>3rd</option></select>
+            </div>
+        </div>
+        <div class="input-group">
+            <label>Work Order / Job #</label>
+            <button class="scan-btn">📷 SCAN BARCODE</button>
+            <input type="text" id="job" placeholder="Scan or type WO#">
+        </div>
+        <div class="input-group">
+            <label>Machine / Press #</label>
+            <input type="text" id="machine" placeholder="e.g. Press 04">
+        </div>
+        <div class="input-group">
+            <label>Part Information</label>
+            <input type="text" id="partName" placeholder="Part Name (e.g. G6 Dome)">
+            <input type="text" id="partNum" placeholder="Part Number (P/N)" style="margin-top: 5px;">
+        </div>
+        <div class="input-group">
+            <label>Tool Status</label>
+            <select id="status" style="border-left: 10px solid #28a745;">
+                <option value="UP">✅ UP - Running Normal</option>
+                <option value="DOWN">❌ DOWN - Defect Found</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Defect Notes & Photos</label>
+            <textarea id="notes" rows="2" placeholder="Explain issues here..."></textarea>
+            <input type="file" accept="image/*" capture="environment" style="margin-top: 5px; border: none;">
+        </div>
+        <button class="submit-btn" onclick="alert('Sending to Hugo...')">🚀 SUBMIT TO QUALITY DEPT</button>
+    </div>
 </div>
-
-<script>
-    // Set default date to today
-    document.getElementById('auditDate').valueAsDate = new Date();
-
-    function submitAudit() {
-        alert("Audit Submitted! Hugo will receive the email shortly.");
-        // Logic to trigger the email will go here once you connect your Google Sheet script
-    }
-</script>
-
+<script>document.getElementById('date').valueAsDate = new Date();</script>
 </body>
 </html>
