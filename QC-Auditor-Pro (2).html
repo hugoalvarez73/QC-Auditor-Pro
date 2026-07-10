@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>QC Auditor Pro</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --green: #76B041; --green-dark: #4E7A2A; --green-light: #F0F7F4; --green-mid: #C5E0B4;
+      --red: #DC2626; --red-light: #FEE2E2; --amber: #D97706; --amber-light: #FEF3C7;
+      --bg: #F8FAFC; --white: #FFFFFF; --border: #E2E8F0; --text: #1E293B; --muted: #64748B;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 60px; }
+    header { background: white; border-bottom: 3px solid var(--green); padding: 14px 20px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow); }
+    .header-inner { max-width: 520px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .logo-title { font-size: 15px; font-weight: 900; letter-spacing: 0.5px; }
+    .logo-title span { color: var(--green); }
+    .logo-sub { font-size: 9px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .live-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; background: var(--green-light); padding: 4px 10px; border-radius: 20px; color: var(--green-dark); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    main { max-width: 520px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .card { background: var(--white); border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
+    .card-header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--green-light); display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: var(--green-dark); }
+    .card-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field-row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+    label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+    label .req { color: var(--red); }
+    input, select, textarea { width: 100%; padding: 11px 13px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 15px; font-family: inherit; font-weight: 600; color: var(--text); background: var(--bg); outline: none; transition: border-color 0.2s, box-shadow 0.2s; appearance: none; -webkit-appearance: none; }
+    input:focus, select:focus, textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(118,176,65,0.15); background: white; }
+    textarea { resize: none; min-height: 72px; line-height: 1.5; }
+    select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2364748B'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+    .section-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: var(--green-dark); display: flex; align-items: center; gap: 8px; }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--green-mid); }
+    .status-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .status-btn { padding: 10px 6px; border-radius: 10px; border: 2px solid var(--border); background: var(--bg); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s; color: var(--muted); font-family: inherit; }
+    .status-btn.active-up { border-color: #16A34A; background: #DCFCE7; color: #16A34A; }
+    .status-btn.active-down { border-color: var(--red); background: var(--red-light); color: var(--red); }
+    .status-btn.active-mold { border-color: var(--amber); background: var(--amber-light); color: var(--amber); }
+    .btn { padding: 14px 20px; border-radius: 12px; border: none; font-family: inherit; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--green); color: white; box-shadow: 0 4px 12px rgba(118,176,65,0.3); }
+    .btn-primary:hover { background: var(--green-dark); }
+    .btn-success { background: var(--green-dark); color: white; box-shadow: 0 4px 12px rgba(78,122,42,0.3); }
+    .btn-secondary { background: var(--bg); color: var(--text); border: 2px solid var(--border); font-family: inherit; }
+    .btn-danger-outline { background: transparent; color: var(--red); border: 1.5px solid #FCA5A5; font-size: 10px; padding: 6px 12px; border-radius: 8px; width: auto; font-family: inherit; cursor: pointer; font-weight: 800; }
+    .btn-scan { background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%); color: white; box-shadow: 0 4px 16px rgba(118,176,65,0.35); font-size: 12px; padding: 14px; width: 100%; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .photo-btn { border: 2px dashed var(--border); border-radius: 10px; padding: 16px; background: var(--bg); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s; min-height: 80px; width: 100%; font-family: inherit; border-style: dashed; }
+    .photo-btn.has-photo { border-color: #16A34A; background: #DCFCE7; color: #16A34A; border-style: solid; }
+    .photo-icon { font-size: 22px; }
+    .round-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+    .round-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg); border-radius: 10px; border: 1px solid var(--border); gap: 8px; }
+    .round-item-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    .round-time { font-size: 10px; font-family: monospace; color: var(--muted); flex-shrink: 0; }
+    .round-info { min-width: 0; }
+    .round-job { font-size: 12px; font-weight: 800; }
+    .round-tool { font-size: 10px; color: var(--muted); }
+    .round-item-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .badge { padding: 3px 8px; border-radius: 20px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .badge-up { background: #DCFCE7; color: #16A34A; }
+    .badge-down { background: var(--red-light); color: var(--red); }
+    .badge-mold { background: var(--amber-light); color: var(--amber); }
+    .badge-nc { background: var(--red-light); color: var(--red); }
+    .remove-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 16px; padding: 2px 4px; transition: color 0.15s; }
+    .remove-btn:hover { color: var(--red); }
+    .toast { padding: 12px 16px; border-radius: 12px; font-size: 12px; font-weight: 700; align-items: center; gap: 10px; border: 1.5px solid; display: none; }
+    .toast.show { display: flex; }
+    .toast-success { background: #DCFCE7; border-color: #86EFAC; color: #16A34A; }
+    .toast-error { background: var(--red-light); border-color: #FCA5A5; color: var(--red); }
+    .toast-info { background: var(--green-light); border-color: var(--green-mid); color: var(--green-dark); }
+    .scan-counter { position: fixed; bottom: 16px; right: 16px; background: white; border: 1px solid var(--border); border-radius: 10px; padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--muted); box-shadow: var(--shadow); z-index: 50; }
+    .scan-counter span { color: var(--green); }
+    .scan-counter span.limit { color: var(--red); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { display: inline-block; animation: spin 0.8s linear infinite; }
+
+    /* NC BUTTON */
+    .nc-btn { width: 100%; padding: 11px 16px; border-radius: 10px; border: 1.5px solid #FCA5A5; background: white; color: var(--red); font-family: inherit; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; position: relative; }
+    .nc-btn:hover { background: var(--red-light); border-color: var(--red); }
+    .nc-btn:active { transform: scale(0.97); }
+    .nc-btn.active { background: var(--red); color: white; border-color: var(--red); }
+    .nc-btn-icon { font-size: 15px; }
+    .nc-btn-label { font-size: 12px; font-weight: 800; }
+    .nc-btn-sub { font-size: 10px; font-weight: 600; opacity: 0.85; text-transform: none; }
+    .nc-active-badge { background: var(--amber); color: white; font-size: 9px; font-weight: 900; padding: 2px 7px; border-radius: 20px; display: none; margin-left: 4px; }
+    .nc-btn.active .nc-active-badge { display: inline-block; }
+
+    /* NCPF SECTION */
+    .ncpf-section { display: none; flex-direction: column; gap: 12px; background: #FFF8F8; border: 1.5px solid #FCA5A5; border-radius: 12px; padding: 16px; margin-top: 4px; }
+    .ncpf-section.visible { display: flex; }
+    .ncpf-header { display: flex; align-items: center; justify-content: space-between; }
+    .ncpf-title { font-size: 12px; font-weight: 900; color: var(--red); text-transform: uppercase; letter-spacing: 1px; }
+    .ncpf-number { font-size: 13px; font-weight: 900; color: var(--red); font-family: monospace; background: var(--red-light); padding: 4px 10px; border-radius: 8px; }
+    .ncpf-label { font-size: 10px; font-weight: 700; color: #EF4444; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; display: block; }
+    .ncpf-input { width: 100%; padding: 10px 12px; border: 1.5px solid #FCA5A5; border-radius: 10px; font-size: 14px; font-family: inherit; font-weight: 600; color: var(--text); background: white; outline: none; }
+    .ncpf-input:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(220,38,38,0.1); }
+    .ncpf-textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #FCA5A5; border-radius: 10px; font-size: 14px; font-family: inherit; font-weight: 600; color: var(--text); background: white; outline: none; resize: none; min-height: 72px; line-height: 1.5; }
+    .ncpf-textarea:focus { border-color: var(--red); }
+    .ncpf-divider { height: 1px; background: #FCA5A5; margin: 4px 0; }
+    .ncpf-tip { font-size: 11px; font-weight: 700; color: #EF4444; text-align: center; padding: 4px 0; }
+    .mat-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .mat-btn { padding: 8px 4px; border-radius: 8px; border: 1.5px solid #FCA5A5; background: white; font-size: 10px; font-weight: 800; cursor: pointer; color: #EF4444; text-align: center; transition: all 0.15s; font-family: inherit; }
+    .mat-btn.selected { background: var(--red); color: white; border-color: var(--red); }
+
+    /* OPEN NCPFs PANEL */
+    .ncpf-panel { background: white; border-radius: 16px; border: 1.5px solid #FCA5A5; box-shadow: var(--shadow); overflow: hidden; }
+    .ncpf-panel-header { padding: 12px 16px; background: var(--red-light); border-bottom: 1px solid #FCA5A5; display: flex; align-items: center; justify-content: space-between; }
+    .ncpf-panel-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: var(--red); }
+    .ncpf-item { padding: 12px 16px; border-bottom: 1px solid #FEE2E2; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .ncpf-item:last-child { border-bottom: none; }
+    .ncpf-item-num { font-size: 12px; font-weight: 900; color: var(--red); font-family: monospace; }
+    .ncpf-item-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .ncpf-item-dept { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
+    .badge-draft { background: var(--amber-light); color: var(--amber); padding: 3px 8px; border-radius: 20px; font-size: 9px; font-weight: 800; white-space: nowrap; }
+    .btn-disp { background: var(--red); color: white; border: none; border-radius: 8px; padding: 7px 12px; font-size: 10px; font-weight: 800; cursor: pointer; white-space: nowrap; font-family: inherit; }
+
+    /* METALS */
+    .metals-section { display: none; }
+    .metals-section.visible { display: block; }
+    .meas-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .meas-row { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+    .meas-name { flex: 1; font-size: 13px; font-weight: 700; }
+    .meas-btn { padding: 6px 10px; border-radius: 8px; border: 1.5px solid; font-size: 10px; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.15s; white-space: nowrap; }
+    .meas-pass { border-color: #86EFAC; background: white; color: var(--muted); }
+    .meas-pass.sel { background: #DCFCE7; border-color: #16A34A; color: #16A34A; }
+    .meas-fail { border-color: #FCA5A5; background: white; color: var(--muted); }
+    .meas-fail.sel { background: var(--red-light); border-color: var(--red); color: var(--red); }
+    .remove-meas { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 2px 4px; }
+    .remove-meas:hover { color: var(--red); }
+    .add-meas-row { display: flex; gap: 8px; }
+    .add-meas-input { flex: 1; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; font-weight: 600; color: var(--text); background: var(--bg); outline: none; }
+    .add-meas-input:focus { border-color: var(--green); }
+    .add-meas-btn { padding: 9px 14px; border-radius: 10px; background: var(--green-light); color: var(--green-dark); border: 1.5px solid var(--green-mid); font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; font-family: inherit; }
+    .meas-summary { font-size: 11px; font-weight: 700; color: var(--muted); display: flex; gap: 12px; padding: 4px 0; }
+    .meas-pass-count { color: #16A34A; }
+    .meas-fail-count { color: var(--red); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">📋</div>
+      <div>
+        <div class="logo-title">QC AUDITOR <span>PRO</span></div>
+        <div class="logo-sub">Channell Commercial Corp</div>
+      </div>
+    </div>
+    <div class="live-badge">
+      <div class="dot"></div>
+      <span id="liveTime"></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- SESSION -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">📝 Session Info</span></div>
+    <div class="card-body">
+      <div class="field-row-3">
+        <div class="field">
+          <label>Department</label>
+          <select id="dept">
+            <option>Injection Molding</option>
+            <option>Structure Foam</option>
+            <option>Blow Mold</option>
+            <option>Fiber</option>
+            <option>Metals</option>
+            <option>SMC</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Shift</label>
+          <select id="shift"><option>1st</option><option>2nd</option><option>3rd</option></select>
+        </div>
+        <div class="field">
+          <label>Round</label>
+          <input type="number" id="round" value="1" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <label>Auditor Name <span class="req">*</span></label>
+        <input type="text" id="auditor" placeholder="Your full name">
+      </div>
+    </div>
+  </div>
+
+  <!-- INSPECTION ENTRY -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🔍 Inspection Entry</span>
+      <button class="btn-danger-outline" onclick="clearForm()">✕ Clear</button>
+    </div>
+    <div class="card-body">
+
+      <input type="file" id="scanFile" accept="image/*" capture="environment" style="display:none" onchange="handleScan(this)">
+      <button class="btn-scan" onclick="document.getElementById('scanFile').click()" id="scanBtn">
+        📷 AUTO-SCAN WORK ORDER REPORT
+      </button>
+
+      <div class="section-label">Job Details</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Work Order # <span class="req">*</span></label>
+          <input type="text" id="jobNum" placeholder="e.g. 1234567">
+        </div>
+        <div class="field">
+          <label>Tool / Machine # <span class="req">*</span></label>
+          <input type="text" id="machineNum" placeholder="e.g. T-42">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Part / Spec #</label>
+          <input type="text" id="partNum" placeholder="Part number">
+        </div>
+        <div class="field">
+          <label>Part Description</label>
+          <input type="text" id="partName" placeholder="Description">
+        </div>
+      </div>
+
+      <div class="section-label">Machine Status</div>
+      <div class="status-group">
+        <button class="status-btn active-up" id="btn-Up" onclick="setStatus('Up')">✅ Up</button>
+        <button class="status-btn" id="btn-Down" onclick="setStatus('Down')">❌ Down</button>
+        <button class="status-btn" id="btn-Mold Change" onclick="setStatus('Mold Change')">🔄 Mold Chg</button>
+      </div>
+
+      <!-- METALS MEASUREMENTS -->
+      <div class="metals-section" id="metalsSection">
+        <div class="section-label">📏 Measurements</div>
+        <div class="meas-list" id="measList"></div>
+        <div id="measSummary" class="meas-summary" style="display:none"></div>
+        <div class="add-meas-row">
+          <input type="text" class="add-meas-input" id="measInput" placeholder="e.g. Wall Thickness, Length..." onkeydown="if(event.key==='Enter')addMeasurement()">
+          <button class="add-meas-btn" onclick="addMeasurement()">＋ Add</button>
+        </div>
+      </div>
+
+      <div class="section-label">Documentation</div>
+      <div class="field-row">
+        <div>
+          <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
+          <button class="photo-btn" id="photoBtn" onclick="document.getElementById('photoFile').click()">
+            <span class="photo-icon">📸</span>
+            <span id="photoBtnText">Add Defect Photo</span>
+          </button>
+        </div>
+        <div class="field">
+          <textarea id="notes" placeholder="Defects or quality issues..."></textarea>
+        </div>
+      </div>
+
+      <!-- NON-CONFORMING BUTTON -->
+      <button class="nc-btn" id="ncBtn" onclick="toggleNC()">
+        <span class="nc-btn-icon">🚨</span>
+        <span class="nc-btn-label">Flag Non-Conforming</span>
+        <span class="nc-btn-sub" id="ncBtnSub"></span>
+        <span class="nc-active-badge" id="ncBadge">ACTIVE</span>
+      </button>
+
+      <!-- NCPF SECTION -->
+      <div class="ncpf-section" id="ncpfSection">
+        <div class="ncpf-header">
+          <span class="ncpf-title">📋 NCPF — Part 1 (Auditor)</span>
+          <span class="ncpf-number" id="ncpfNum">—</span>
+        </div>
+        <div class="ncpf-divider"></div>
+        <div>
+          <label class="ncpf-label">Problem Description <span style="color:var(--red)">*</span></label>
+          <textarea class="ncpf-textarea" id="ncProblem" placeholder="Describe the defect or issue in detail..."></textarea>
+        </div>
+        <div>
+          <label class="ncpf-label">Type of Material <span style="color:var(--red)">*</span></label>
+          <div class="mat-group">
+            <button class="mat-btn" id="mat-New" onclick="setMatType('New')">New Material</button>
+            <button class="mat-btn" id="mat-WIP" onclick="setMatType('WIP')">Work In Progress</button>
+            <button class="mat-btn" id="mat-Finished" onclick="setMatType('Finished')">Finished Goods</button>
+          </div>
+        </div>
+        <div class="field-row">
+          <div>
+            <label class="ncpf-label">Qty Affected <span style="color:var(--red)">*</span></label>
+            <input type="number" class="ncpf-input" id="ncQty" placeholder="0" min="1">
+          </div>
+          <div>
+            <label class="ncpf-label">Mfg Supervisor</label>
+            <input type="text" class="ncpf-input" id="ncSupervisor" placeholder="Supervisor name">
+          </div>
+        </div>
+        <div class="field-row">
+          <div>
+            <label class="ncpf-label">Area Responsible <span style="color:var(--red)">*</span></label>
+            <select class="ncpf-input" id="ncAreaResp">
+              <option value="">Select area...</option>
+              <option>Injection Molding</option>
+              <option>Structure Foam</option>
+              <option>Blow Mold</option>
+              <option>Fiber</option>
+              <option>Metals</option>
+              <option>SMC</option>
+              <option>Engineering</option>
+              <option>Quality</option>
+              <option>Supplier</option>
+              <option>Customer</option>
+            </select>
+          </div>
+          <div>
+            <label class="ncpf-label">Trace Code <span style="font-weight:500;text-transform:none;color:#F87171">(if available)</span></label>
+            <input type="text" class="ncpf-input" id="ncTraceCode" placeholder="Optional">
+          </div>
+        </div>
+        <div>
+          <label class="ncpf-label">Summary <span style="font-weight:500;text-transform:none;color:#F87171">(one line)</span></label>
+          <input type="text" class="ncpf-input" id="ncSummary" placeholder="e.g. Short shots on parting line, Tool T-42">
+        </div>
+        <div>
+          <label class="ncpf-label">Generated By</label>
+          <input type="text" class="ncpf-input" id="ncGeneratedBy" placeholder="Auto-filled" readonly style="opacity:0.7">
+        </div>
+        <div class="ncpf-divider"></div>
+        <div class="ncpf-tip">Submit inspection to notify Quality team</div>
+      </div>
+
+      <button class="btn btn-primary" onclick="addToRound()">＋ ADD TO ROUND</button>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- CURRENT ROUND -->
+  <div class="card" id="roundCard" style="display:none">
+    <div class="card-header">
+      <span class="card-title" id="roundTitle">📋 Round</span>
+      <button class="btn-danger-outline" onclick="clearRound()">Clear All</button>
+    </div>
+    <div class="card-body">
+      <div class="round-list" id="roundList"></div>
+      <button class="btn btn-success" onclick="syncToSheet()" id="syncBtn">🚀 SYNC TO EXCEL</button>
+      <button class="btn btn-secondary" onclick="emailReport()" style="margin-top:0;">📧 EMAIL REPORT TO MYSELF</button>
+    </div>
+  </div>
+
+  <!-- OPEN NCPFs -->
+  <div class="ncpf-panel" id="ncpfPanel" style="display:none">
+    <div class="ncpf-panel-header">
+      <span class="ncpf-panel-title">🚨 Open NCPFs — Awaiting Disposition</span>
+      <span id="ncpfPanelCount" style="font-size:10px;font-weight:800;color:var(--red)"></span>
+    </div>
+    <div id="ncpfPanelList"></div>
+  </div>
+
+</main>
+
+<div class="scan-counter">AI Scans: <span id="scanCount">0</span>/250</div>
+
+<script>
+  // ── CONFIG ───────────────────────────────────────────────────────
+  const GEMINI_KEY = 'AIzaSyAjR2V4gHZskSO1zTEyqN-jZcgPyRAS9mY';
+  const POWER_AUTOMATE_URL = 'PASTE_YOUR_POWER_AUTOMATE_URL_HERE';
+  const NOTIFY_EMAILS = [
+    'halvarez@channell.com'
+    // Add more: 'manager2@channell.com'
+  ];
+
+  // ── STATE ────────────────────────────────────────────────────────
+  let currentStatus = 'Up';
+  let currentPhoto = '';
+  let round = [];
+  let ncActive = false;
+  let ncMatType = '';
+  let measurements = [];
+  let openNCPFs = [];
+
+  try { openNCPFs = JSON.parse(localStorage.getItem('openNCPFs') || '[]'); } catch(e) { openNCPFs = []; }
+
+  // ── CLOCK ────────────────────────────────────────────────────────
+  function updateClock() {
+    document.getElementById('liveTime').textContent =
+      new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  updateClock(); setInterval(updateClock, 1000);
+
+  // ── AUTO SHIFT ───────────────────────────────────────────────────
+  (function() {
+    var t = new Date().getHours() * 60 + new Date().getMinutes();
+    document.getElementById('shift').value = t >= 360 && t < 870 ? '1st' : t >= 870 && t < 1350 ? '2nd' : '3rd';
+  })();
+
+  // ── AUDITOR NAME MEMORY ──────────────────────────────────────────
+  var savedName = localStorage.getItem('auditorName');
+  if (savedName) document.getElementById('auditor').value = savedName;
+  document.getElementById('auditor').addEventListener('input', function(e) {
+    localStorage.setItem('auditorName', e.target.value);
+    if (ncActive) document.getElementById('ncGeneratedBy').value = e.target.value;
+  });
+
+  // ── DEPT CHANGE ──────────────────────────────────────────────────
+  document.getElementById('dept').addEventListener('change', function() {
+    var isMetals = this.value === 'Metals';
+    document.getElementById('metalsSection').classList.toggle('visible', isMetals);
+    if (!isMetals) { measurements = []; renderMeasurements(); }
+  });
+
+  // ── SCAN COUNT ───────────────────────────────────────────────────
+  function getScanCount() {
+    var today = new Date().toLocaleDateString();
+    if (localStorage.getItem('scanDate') !== today) {
+      localStorage.setItem('scanDate', today);
+      localStorage.setItem('scanCount', '0');
+    }
+    return parseInt(localStorage.getItem('scanCount') || '0');
+  }
+  function incScanCount() {
+    var c = getScanCount() + 1;
+    localStorage.setItem('scanCount', c);
+    var el = document.getElementById('scanCount');
+    el.textContent = c;
+    el.className = c >= 250 ? 'limit' : '';
+  }
+  document.getElementById('scanCount').textContent = getScanCount();
+
+  // ── TOAST ────────────────────────────────────────────────────────
+  var toastTimer;
+  function showToast(type, msg) {
+    var t = document.getElementById('toast');
+    t.className = 'toast toast-' + type + ' show';
+    t.innerHTML = (type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️') + ' ' + msg;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { t.classList.remove('show'); }, 4000);
+  }
+
+  // ── STATUS ───────────────────────────────────────────────────────
+  function setStatus(s) {
+    currentStatus = s;
+    ['Up','Down','Mold Change'].forEach(function(st) {
+      var btn = document.getElementById('btn-' + st);
+      btn.className = 'status-btn';
+      if (st === s) btn.classList.add(s === 'Up' ? 'active-up' : s === 'Down' ? 'active-down' : 'active-mold');
+    });
+  }
+
+  // ── COMPRESS IMAGE ───────────────────────────────────────────────
+  function compressImage(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var maxW = 1024, w = img.width, h = img.height;
+          if (w > maxW) { h = (maxW / w) * h; w = maxW; }
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve({ b64: canvas.toDataURL('image/jpeg', 0.75).split(',')[1], full: canvas.toDataURL('image/jpeg', 0.75) });
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ── PHOTO ────────────────────────────────────────────────────────
+  function handlePhoto(input) {
+    var file = input.files[0];
+    if (!file) return;
+    compressImage(file).then(function(r) {
+      currentPhoto = r.full;
+      document.getElementById('photoBtn').classList.add('has-photo');
+      document.getElementById('photoBtnText').textContent = 'Photo Attached ✅';
+      showToast('success', 'Defect photo attached.');
+    }).catch(function() { showToast('error', 'Photo failed.'); });
+    input.value = '';
+  }
+
+  // ── AI SCAN ──────────────────────────────────────────────────────
+  function handleScan(input) {
+    var file = input.files[0];
+    if (!file) return;
+    var auditor = document.getElementById('auditor').value.trim();
+    if (!auditor) { showToast('error', 'Enter your name before scanning.'); return; }
+    if (getScanCount() >= 250) { showToast('error', 'Daily scan limit reached.'); return; }
+
+    var btn = document.getElementById('scanBtn');
+    btn.innerHTML = '<span class="spin">⏳</span> SCANNING...';
+    btn.disabled = true;
+    showToast('info', 'AI analyzing work order...');
+
+    compressImage(file).then(function(r) {
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_KEY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { inline_data: { mime_type: 'image/jpeg', data: r.b64 } },
+            { text: 'This is a Channell Commercial / Rockwall manufacturing work order. Extract ONLY these 4 fields:\n\n1. WorkNumber = the value next to the label "Job:" (example: DS-1808125)\n2. partNumber = the value next to the label "Assy:" (example: 03127042)\n3. partName = the value next to the label "Assy Desc:" (example: COVER, OUTER 900 SERIES BLACK)\n4. toolNumber = the value next to the label "Sched Group:" (example: IM19)\n\nReturn ONLY a raw JSON object with exactly these keys. No markdown, no explanation, no extra fields. If a field is not found return empty string.\nExample: {"WorkNumber":"DS-1808125","partNumber":"03127042","partName":"COVER, OUTER 900 SERIES BLACK","toolNumber":"IM19"}' }
+          ]}],
+          generationConfig: { responseMimeType: 'application/json' }
+        })
+      });
+    }).then(function(res) {
+      if (!res.ok) throw new Error('API ' + res.status);
+      return res.json();
+    }).then(function(data) {
+      var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) ? data.candidates[0].content.parts[0].text : '{}';
+      var parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      if (parsed.WorkNumber) document.getElementById('jobNum').value = parsed.WorkNumber;
+      if (parsed.partNumber) document.getElementById('partNum').value = parsed.partNumber;
+      if (parsed.partName) document.getElementById('partName').value = parsed.partName;
+      if (parsed.toolNumber) document.getElementById('machineNum').value = parsed.toolNumber;
+      incScanCount();
+      showToast('success', 'Report scanned! Verify fields then add to round.');
+    }).catch(function(err) {
+      console.error(err);
+      showToast('error', 'Could not read report. Enter manually.');
+    }).finally(function() {
+      btn.innerHTML = '📷 AUTO-SCAN WORK ORDER REPORT';
+      btn.disabled = false;
+      input.value = '';
+    });
+  }
+
+  // ── METALS MEASUREMENTS ──────────────────────────────────────────
+  function addMeasurement() {
+    var input = document.getElementById('measInput');
+    var name = input.value.trim();
+    if (!name) return;
+    measurements.push({ id: Math.random().toString(36).substr(2,6), name: name, result: '' });
+    input.value = '';
+    renderMeasurements();
+    input.focus();
+  }
+
+  function setMeasResult(id, result) {
+    measurements = measurements.map(function(m) { return m.id === id ? Object.assign({}, m, { result: result }) : m; });
+    renderMeasurements();
+  }
+
+  function removeMeasurement(id) {
+    measurements = measurements.filter(function(m) { return m.id !== id; });
+    renderMeasurements();
+  }
+
+  function renderMeasurements() {
+    var list = document.getElementById('measList');
+    var summary = document.getElementById('measSummary');
+    if (measurements.length === 0) { list.innerHTML = ''; summary.style.display = 'none'; return; }
+    list.innerHTML = measurements.map(function(m) {
+      return '<div class="meas-row">' +
+        '<span class="meas-name">' + m.name + '</span>' +
+        '<button class="meas-btn meas-pass' + (m.result === 'Pass' ? ' sel' : '') + '" onclick="setMeasResult(\'' + m.id + '\',\'Pass\')">✅ In Spec</button>' +
+        '<button class="meas-btn meas-fail' + (m.result === 'Fail' ? ' sel' : '') + '" onclick="setMeasResult(\'' + m.id + '\',\'Fail\')">❌ Out of Spec</button>' +
+        '<button class="remove-meas" onclick="removeMeasurement(\'' + m.id + '\')">✕</button>' +
+        '</div>';
+    }).join('');
+    var passed = measurements.filter(function(m) { return m.result === 'Pass'; }).length;
+    var failed = measurements.filter(function(m) { return m.result === 'Fail'; }).length;
+    var pending = measurements.filter(function(m) { return m.result === ''; }).length;
+    summary.style.display = 'flex';
+    summary.innerHTML = '<span class="meas-pass-count">✅ ' + passed + ' In Spec</span>' +
+      '<span class="meas-fail-count">❌ ' + failed + ' Out of Spec</span>' +
+      (pending > 0 ? '<span>⏳ ' + pending + ' pending</span>' : '');
+  }
+
+  // ── NCPF NUMBER GENERATOR ─────────────────────────────────────────
+  function generateNCPFNum() {
+    var year = String(new Date().getFullYear()).slice(-2);
+    var stored = {};
+    try { stored = JSON.parse(localStorage.getItem('ncpfSeq') || '{}'); } catch(e) {}
+    var seq = stored.year === year ? (stored.seq || 0) : 0;
+    seq++;
+    localStorage.setItem('ncpfSeq', JSON.stringify({ year: year, seq: seq }));
+    return year + '-' + String(seq).padStart(4, '0');
+  }
+
+  // ── NC TOGGLE ─────────────────────────────────────────────────────
+  function toggleNC() {
+    ncActive = !ncActive;
+    var btn = document.getElementById('ncBtn');
+    var sub = document.getElementById('ncBtnSub');
+    var section = document.getElementById('ncpfSection');
+    btn.classList.toggle('active', ncActive);
+    section.classList.toggle('visible', ncActive);
+    if (ncActive) {
+      var num = generateNCPFNum();
+      document.getElementById('ncpfNum').textContent = 'NCPF# ' + num;
+      document.getElementById('ncpfNum').dataset.val = num;
+      sub.textContent = 'NCPF# ' + num + ' — Tap to cancel';
+      document.getElementById('ncGeneratedBy').value = document.getElementById('auditor').value;
+    } else {
+      sub.textContent = 'Tap to open NCPF report';
+      resetNCPF();
+    }
+  }
+
+  function setMatType(type) {
+    ncMatType = type;
+    ['New','WIP','Finished'].forEach(function(t) {
+      document.getElementById('mat-' + t).classList.toggle('selected', t === type);
+    });
+  }
+
+  function resetNCPF() {
+    ncMatType = '';
+    document.getElementById('ncProblem').value = '';
+    document.getElementById('ncQty').value = '';
+    document.getElementById('ncSupervisor').value = '';
+    document.getElementById('ncAreaResp').value = '';
+    document.getElementById('ncTraceCode').value = '';
+    document.getElementById('ncSummary').value = '';
+    ['New','WIP','Finished'].forEach(function(t) {
+      document.getElementById('mat-' + t).classList.remove('selected');
+    });
+  }
+
+  function validateNCPF() {
+    if (!document.getElementById('ncProblem').value.trim()) { showToast('error', 'NCPF: Describe the problem.'); return false; }
+    if (!ncMatType) { showToast('error', 'NCPF: Select material type.'); return false; }
+    if (!document.getElementById('ncQty').value.trim()) { showToast('error', 'NCPF: Enter quantity affected.'); return false; }
+    return true;
+  }
+
+  function buildNCPFData() {
+    return {
+      ncpfNumber: document.getElementById('ncpfNum').dataset.val || '',
+      problem: document.getElementById('ncProblem').value.trim(),
+      matType: ncMatType,
+      qty: document.getElementById('ncQty').value.trim(),
+      supervisor: document.getElementById('ncSupervisor').value.trim(),
+      generatedBy: document.getElementById('ncGeneratedBy').value.trim(),
+      areaResponsible: document.getElementById('ncAreaResp').value,
+      traceCode: document.getElementById('ncTraceCode').value.trim(),
+      summary: document.getElementById('ncSummary').value.trim(),
+      department: document.getElementById('dept').value,
+      workOrder: document.getElementById('jobNum').value.trim(),
+      partNum: document.getElementById('partNum').value.trim(),
+      partName: document.getElementById('partName').value.trim(),
+      shift: document.getElementById('shift').value,
+      date: new Date().toLocaleDateString('en-US'),
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      status: 'DRAFT - Awaiting Disposition',
+      disposition: '', approvedBy: '', isManager: '', justification: '', reworkInstructions: ''
+    };
+  }
+
+  function sendNCPFEmail(data) {
+    var subject = 'NCPF# ' + data.ncpfNumber + ' — Non-Conforming | ' + data.department;
+    var body = 'NON-CONFORMING PRODUCT FORM\n' +
+      'NCPF#: ' + data.ncpfNumber + '\n' +
+      'Date: ' + data.date + ' ' + data.time + '\n' +
+      'Department: ' + data.department + '\n' +
+      'Work Order: ' + data.workOrder + '\n' +
+      'Part #: ' + data.partNum + '\n' +
+      'Part Name: ' + data.partName + '\n' +
+      'Shift: ' + data.shift + '\n\n' +
+      'PROBLEM:\n' + data.problem + '\n\n' +
+      'Material Type: ' + data.matType + '\n' +
+      'Area Responsible: ' + data.areaResponsible + '\n' +
+      'Trace Code: ' + (data.traceCode || 'N/A') + '\n' +
+      'Summary: ' + (data.summary || 'N/A') + '\n' +
+      'Qty Affected: ' + data.qty + '\n' +
+      'Supervisor: ' + data.supervisor + '\n' +
+      'Generated By: ' + data.generatedBy + '\n\n' +
+      'STATUS: AWAITING DISPOSITION\n' +
+      'Please open QC Auditor Pro to complete disposition.';
+    window.location.href = 'mailto:' + NOTIFY_EMAILS.join(',') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  }
+
+  function saveOpenNCPF(data) {
+    openNCPFs.push(data);
+    localStorage.setItem('openNCPFs', JSON.stringify(openNCPFs));
+    renderOpenNCPFs();
+  }
+
+  function renderOpenNCPFs() {
+    var panel = document.getElementById('ncpfPanel');
+    var list = document.getElementById('ncpfPanelList');
+    var count = document.getElementById('ncpfPanelCount');
+    var drafts = openNCPFs.filter(function(n) { return n.status && n.status.indexOf('DRAFT') >= 0; });
+    if (drafts.length === 0) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    count.textContent = drafts.length + ' open';
+    list.innerHTML = openNCPFs.map(function(n, i) {
+      if (!n.status || n.status.indexOf('DRAFT') < 0) return '';
+      return '<div class="ncpf-item">' +
+        '<div>' +
+          '<div class="ncpf-item-num">NCPF# ' + n.ncpfNumber + '</div>' +
+          '<div class="ncpf-item-desc">' + n.problem.substring(0, 55) + (n.problem.length > 55 ? '...' : '') + '</div>' +
+          '<div class="ncpf-item-dept">' + n.department + ' · ' + n.date + ' · WO: ' + (n.workOrder || 'N/A') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">' +
+          '<span class="badge-draft">AWAITING DISPOSITION</span>' +
+          '<button class="btn-disp" onclick="openDisposition(' + i + ')">Complete →</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function openDisposition(index) {
+    var ncpf = openNCPFs[index];
+    if (!ncpf) return;
+
+    var disp = prompt(
+      'NCPF# ' + ncpf.ncpfNumber + '\n' +
+      'Problem: ' + ncpf.problem.substring(0, 60) + '\n\n' +
+      'Select disposition:\n' +
+      '1 = REWORK\n' +
+      '2 = SORT\n' +
+      '3 = SCRAP\n' +
+      '4 = USE AS IS (UAI)\n' +
+      '5 = PULL STOCK\n\n' +
+      'Enter number (1-5):'
+    );
+
+    var dispMap = { '1':'Rework', '2':'Sort', '3':'Scrap', '4':'Use As Is (UAI)', '5':'Pull Stock' };
+    var disposition = dispMap[disp];
+    if (!disposition) { showToast('error', 'Invalid selection. Enter 1-5.'); return; }
+
+    var approvedBy = '', isManager = false, justification = '', reworkInstructions = '';
+
+    if (disposition === 'Rework' || disposition === 'Use As Is (UAI)') {
+      approvedBy = prompt('WARNING: ' + disposition + ' requires MANAGER approval.\n\nEnter approving manager name:');
+      if (!approvedBy) { showToast('error', 'Manager name required for ' + disposition + '.'); return; }
+
+      isManager = confirm('Is "' + approvedBy + '" a manager?\n\nOK = Yes  |  Cancel = No (will be blocked)');
+      if (!isManager) {
+        alert('BLOCKED: Only managers can approve ' + disposition + '.\n\nPlease have a manager complete this disposition.');
+        return;
+      }
+
+      if (disposition === 'Use As Is (UAI)') {
+        justification = prompt('UAI (ISO 9001) requires written justification.\n\nEnter justification:');
+        if (!justification) { showToast('error', 'Written justification required for UAI.'); return; }
+      }
+
+      if (disposition === 'Rework') {
+        reworkInstructions = prompt('Enter rework instructions (optional):') || '';
+      }
+    } else {
+      approvedBy = prompt('Dispositioned by (your name):') || '';
+    }
+
+    openNCPFs[index] = Object.assign({}, ncpf, {
+      status: 'CLOSED - ' + disposition,
+      disposition: disposition,
+      approvedBy: approvedBy,
+      isManager: isManager ? 'Yes' : 'No',
+      justification: justification,
+      reworkInstructions: reworkInstructions,
+      closedDate: new Date().toLocaleDateString('en-US'),
+      closedTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    });
+
+    localStorage.setItem('openNCPFs', JSON.stringify(openNCPFs));
+    renderOpenNCPFs();
+    showToast('success', 'NCPF# ' + ncpf.ncpfNumber + ' — ' + disposition + ' recorded.');
+  }
+
+  // ── CLEAR FORM ───────────────────────────────────────────────────
+  function clearForm() {
+    document.getElementById('jobNum').value = '';
+    document.getElementById('machineNum').value = '';
+    document.getElementById('partNum').value = '';
+    document.getElementById('partName').value = '';
+    document.getElementById('notes').value = '';
+    document.getElementById('scanFile').value = '';
+    document.getElementById('photoFile').value = '';
+    currentPhoto = '';
+    document.getElementById('photoBtn').classList.remove('has-photo');
+    document.getElementById('photoBtnText').textContent = 'Add Defect Photo';
+    setStatus('Up');
+    measurements = []; renderMeasurements();
+  }
+
+  // ── ADD TO ROUND ─────────────────────────────────────────────────
+  function addToRound() {
+    var auditor = document.getElementById('auditor').value.trim();
+    var jobNum = document.getElementById('jobNum').value.trim();
+    var machineNum = document.getElementById('machineNum').value.trim();
+    if (!auditor) { showToast('error', 'Enter your name first.'); return; }
+    if (!jobNum) { showToast('error', 'Work Order # is required.'); return; }
+    if (!machineNum) { showToast('error', 'Tool / Machine # is required.'); return; }
+
+    if (ncActive && !validateNCPF()) return;
+
+    var now = new Date();
+    var entry = {
+      id: Math.random().toString(36).substr(2, 9),
+      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      date: now.toLocaleDateString('en-US'),
+      jobNum: jobNum, machineNum: machineNum,
+      partNum: document.getElementById('partNum').value.trim(),
+      partName: document.getElementById('partName').value.trim(),
+      status: currentStatus,
+      notes: document.getElementById('notes').value.trim(),
+      isNC: ncActive,
+      ncpfNumber: ncActive ? document.getElementById('ncpfNum').dataset.val : '',
+      areaResponsible: ncActive ? document.getElementById('ncAreaResp').value : '',
+      traceCode: ncActive ? document.getElementById('ncTraceCode').value.trim() : '',
+      summary: ncActive ? document.getElementById('ncSummary').value.trim() : '',
+      measSummary: measurements.length > 0 ? measurements.map(function(m) { return m.name + ': ' + (m.result || 'Pending'); }).join(' | ') : '',
+      measCount: measurements.length,
+      hasPhoto: currentPhoto ? 'Yes' : 'No',
+      photoBase64: currentPhoto ? currentPhoto.split(',')[1] : '',
+      photoName: currentPhoto ? 'QC-' + jobNum + '-' + Date.now() + '.jpg' : ''
+    };
+
+    if (ncActive) {
+      var ncpfData = buildNCPFData();
+      ncpfData.workOrder = jobNum;
+      ncpfData.partNum = entry.partNum;
+      ncpfData.partName = entry.partName;
+      saveOpenNCPF(ncpfData);
+      setTimeout(function() { sendNCPFEmail(ncpfData); }, 800);
+      ncActive = false;
+      document.getElementById('ncBtn').classList.remove('active');
+      document.getElementById('ncBtnSub').textContent = 'Tap to open NCPF report';
+      document.getElementById('ncpfSection').classList.remove('visible');
+      resetNCPF();
+    }
+
+    round.push(entry);
+    renderRound();
+    clearForm();
+    showToast('success', 'Added to round — ' + round.length + ' inspection' + (round.length > 1 ? 's' : '') + ' total.');
+  }
+
+  // ── RENDER ROUND ─────────────────────────────────────────────────
+  function renderRound() {
+    var card = document.getElementById('roundCard');
+    var list = document.getElementById('roundList');
+    var title = document.getElementById('roundTitle');
+    var roundNum = document.getElementById('round').value;
+    if (round.length === 0) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    title.textContent = 'Round ' + roundNum + ' · ' + round.length + ' Inspection' + (round.length > 1 ? 's' : '');
+    list.innerHTML = round.map(function(e) {
+      var badgeClass = e.status === 'Up' ? 'up' : e.status === 'Down' ? 'down' : 'mold';
+      return '<div class="round-item">' +
+        '<div class="round-item-left">' +
+          '<span class="round-time">' + e.time + '</span>' +
+          '<div class="round-info">' +
+            '<div class="round-job">JOB ' + e.jobNum + (e.isNC ? ' 🚨' : '') + '</div>' +
+            '<div class="round-tool">Tool ' + e.machineNum + (e.partNum ? ' · ' + e.partNum : '') + '</div>' +
+            (e.measCount > 0 ? '<div class="round-tool" style="color:var(--green)">📏 ' + e.measCount + ' measurements</div>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="round-item-right">' +
+          (e.hasPhoto === 'Yes' ? '<span>📸</span>' : '') +
+          '<span class="badge badge-' + badgeClass + '">' + e.status + '</span>' +
+          '<button class="remove-btn" onclick="removeEntry(\'' + e.id + '\')">✕</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function removeEntry(id) {
+    round = round.filter(function(e) { return e.id !== id; });
+    renderRound();
+  }
+
+  function clearRound() {
+    if (!confirm('Clear all inspections in this round?')) return;
+    round = []; renderRound();
+  }
+
+  // ── EMAIL REPORT ─────────────────────────────────────────────────
+  function emailReport() {
+    if (round.length === 0) { showToast('error', 'No inspections to email.'); return; }
+
+    var dept = document.getElementById('dept').value;
+    var shift = document.getElementById('shift').value;
+    var roundNum = document.getElementById('round').value;
+    var auditor = document.getElementById('auditor').value;
+    var date = new Date().toLocaleDateString('en-US');
+
+    var total = round.length;
+    var ncCount = round.filter(function(e) { return e.isNC; }).length;
+    var downCount = round.filter(function(e) { return e.status === 'Down'; }).length;
+    var upCount = round.filter(function(e) { return e.status === 'Up'; }).length;
+
+    var lines = round.map(function(e, i) {
+      var line = (i+1) + '. ' + e.time + ' | JOB: ' + e.jobNum + ' | Tool: ' + e.machineNum;
+      if (e.partNum) line += ' | P/N: ' + e.partNum;
+      if (e.partName) line += ' | ' + e.partName;
+      line += ' | Status: ' + e.status;
+      if (e.isNC) line += ' | NON-CONFORMING NCPF#' + e.ncpfNumber;
+      if (e.notes) line += ' | Notes: ' + e.notes;
+      if (e.measSummary) line += ' | Measurements: ' + e.measSummary;
+      return line;
+    }).join(', ');
+
+    var subject = 'QC Audit Report — ' + dept + ' — Round ' + roundNum + ' — ' + date;
+
+    var sep = '=====================================';
+    var body = 'QC AUDIT REPORT' + sep +
+      'Auditor: ' + auditor +
+      ' | Department: ' + dept +
+      ' | Shift: ' + shift +
+      ' | Round: ' + roundNum +
+      ' | Date: ' + date + sep +
+      'SUMMARY - Total: ' + total +
+      ' | Up: ' + upCount +
+      ' | Down: ' + downCount +
+      ' | NC: ' + ncCount + sep +
+      'INSPECTIONS: ' + lines + sep +
+      'Generated by QC Auditor Pro - Channell Commercial Corporation';
+
+    window.location.href = 'mailto:halvarez@channell.com' +
+      '?subject=' + encodeURIComponent(subject) +
+      '&body=' + encodeURIComponent(body);
+
+    showToast('success', 'Email app opened — just hit Send!');
+  }
+
+  // ── SYNC TO EXCEL ─────────────────────────────────────────────────
+  function syncToSheet() {
+    if (round.length === 0) { showToast('error', 'No inspections to sync.'); return; }
+    if (POWER_AUTOMATE_URL === 'PASTE_YOUR_POWER_AUTOMATE_URL_HERE') {
+      showToast('error', 'Power Automate URL not set yet.'); return;
+    }
+    var btn = document.getElementById('syncBtn');
+    btn.innerHTML = '<span class="spin">⏳</span> SYNCING...';
+    btn.disabled = true;
+    var dept = document.getElementById('dept').value;
+    var shift = document.getElementById('shift').value;
+    var roundNum = document.getElementById('round').value;
+    var auditor = document.getElementById('auditor').value;
+    var success = 0, failed = 0;
+    var promises = round.map(function(entry) {
+      return fetch(POWER_AUTOMATE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          Timestamp: entry.date + ' ' + entry.time,
+          Department: dept, Shift: shift, Round: roundNum, AuditorName: auditor,
+          WorkOrder: entry.jobNum, PartNumber: entry.partNum, PartName: entry.partName,
+          ToolNumber: entry.machineNum, Status: entry.status, Notes: entry.notes,
+          Measurements: entry.measSummary || '', NonConforming: entry.isNC ? 'Yes' : 'No',
+          HasPhoto: entry.hasPhoto, PhotoBase64: entry.photoBase64, PhotoName: entry.photoName, PhotoLink: ''
+        })
+      }).then(function() { success++; }).catch(function() { failed++; });
+    });
+    Promise.all(promises).then(function() {
+      btn.innerHTML = '🚀 SYNC TO EXCEL';
+      btn.disabled = false;
+      if (failed === 0) {
+        showToast('success', 'All ' + success + ' entries synced to Excel!');
+        round = []; renderRound();
+      } else {
+        showToast('error', success + ' synced, ' + failed + ' failed. Check connection.');
+      }
+    });
+  }
+
+  // ── INIT ─────────────────────────────────────────────────────────
+  renderOpenNCPFs();
+</script>
+</body>
+</html>
