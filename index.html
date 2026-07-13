@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -393,7 +392,7 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
   // ── CONFIG ───────────────────────────────────────────────────────
-  const GEMINI_KEY = 'AIzaSyAjR2V4gHZskSO1zTEyqN-jZcgPyRAS9mY';
+  // OCR scan - no API key needed
   const POWER_AUTOMATE_URL = 'PASTE_YOUR_POWER_AUTOMATE_URL_HERE';
   const NOTIFY_EMAILS = [
     'halvarez@channell.com'
@@ -512,66 +511,62 @@
     input.value = '';
   }
 
-  // ── AI SCAN ──────────────────────────────────────────────────────
+  // ── OCR SCAN (Free, No API Key, Works Offline) ───────────────────
   function handleScan(input) {
     var file = input.files[0];
     if (!file) return;
     var auditor = document.getElementById('auditor').value.trim();
     if (!auditor) { showToast('error', 'Enter your name before scanning.'); return; }
-    if (getScanCount() >= 250) { showToast('error', 'Daily scan limit reached.'); return; }
 
     var btn = document.getElementById('scanBtn');
-    btn.innerHTML = '<span class="spin">⏳</span> SCANNING...';
+    btn.innerHTML = '<span class="spin">&#x231B;</span> READING...';
     btn.disabled = true;
-    showToast('info', 'AI analyzing work order...');
+    showToast('info', 'Reading work order text...', 0);
 
-    compressImage(file).then(function(r) {
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_KEY, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [
-            { inline_data: { mime_type: 'image/jpeg', data: r.b64 } },
-            { text: 'This is a Channell Commercial / Rockwall manufacturing work order. Extract ONLY these 4 fields:\n\n1. WorkNumber = the value next to the label "Job:" (example: DS-1808125)\n2. partNumber = the value next to the label "Assy:" (example: 03127042)\n3. partName = the value next to the label "Assy Desc:" (example: COVER, OUTER 900 SERIES BLACK)\n4. toolNumber = the value next to the label "Sched Group:" (example: IM19)\n\nReturn ONLY a raw JSON object with exactly these keys. No markdown, no explanation, no extra fields. If a field is not found return empty string.\nExample: {"WorkNumber":"DS-1808125","partNumber":"03127042","partName":"COVER, OUTER 900 SERIES BLACK","toolNumber":"IM19"}' }
-          ]}],
-          generationConfig: { responseMimeType: 'application/json' }
-        })
-      });
-    }).then(function(res) {
-      if (!res.ok) throw new Error('API ' + res.status);
-      return res.json();
-    }).then(function(data) {
-      // Check for API errors
-      if (data.error) {
-        showToast('error', 'API Error: ' + data.error.message.substring(0, 80));
-        return;
+    Tesseract.recognize(file, 'eng').then(function(result) {
+      var text = result.data.text;
+      console.log('OCR Text:', text);
+
+      var found = false;
+      var lines = text.split('\n');
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (line.match(/^Job:/i)) {
+          var val = line.replace(/^Job:/i, '').trim();
+          if (val) { document.getElementById('jobNum').value = val; found = true; }
+        }
+        if (line.match(/^Assy:/i) && !line.match(/Assy Desc/i) && !line.match(/Assy:/i)) {
+          var val = line.replace(/^Assy:/i, '').trim();
+          if (val) { document.getElementById('partNum').value = val; found = true; }
+        }
+        if (line.match(/^Assy Desc:/i)) {
+          var val = line.replace(/^Assy Desc:/i, '').trim();
+          if (val) { document.getElementById('partName').value = val; found = true; }
+        }
+        if (line.match(/^Sched Group:/i)) {
+          var val = line.replace(/^Sched Group:/i, '').trim();
+          if (val) { document.getElementById('machineNum').value = val; found = true; }
+        }
       }
-      if (!data.candidates || data.candidates.length === 0) {
-        showToast('error', 'No response from AI. Check API key.');
-        return;
+
+      if (found) {
+        incScanCount();
+        showToast('success', 'Work order scanned! Verify fields and add to round.');
+      } else {
+        showToast('error', 'Could not read fields. Try better lighting or enter manually.');
       }
-      var text = data.candidates[0].content.parts[0].text || '{}';
-      var parsed = {};
-      try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); } 
-      catch(e) { showToast('error', 'Could not parse response. Try again.'); return; }
-      if (parsed.WorkNumber) document.getElementById('jobNum').value = parsed.WorkNumber;
-      if (parsed.partNumber) document.getElementById('partNum').value = parsed.partNumber;
-      if (parsed.partName) document.getElementById('partName').value = parsed.partName;
-      if (parsed.toolNumber) document.getElementById('machineNum').value = parsed.toolNumber;
-      incScanCount();
-      showToast('success', 'Report scanned! Verify fields then add to round.');
     }).catch(function(err) {
-      console.error(err);
-      var errMsg = err ? err.toString() : 'Unknown error';
-      showToast('error', 'Scan failed: ' + errMsg.substring(0, 80));
+      console.error('OCR Error:', err);
+      showToast('error', 'Scan failed. Try better lighting or enter manually.');
     }).finally(function() {
-      btn.innerHTML = '📷 AUTO-SCAN WORK ORDER REPORT';
+      btn.innerHTML = '&#x1F4F7; SCAN WORK ORDER';
       btn.disabled = false;
       input.value = '';
     });
   }
 
-  // ── METALS MEASUREMENTS ──────────────────────────────────────────
+    // ── METALS MEASUREMENTS ──────────────────────────────────────────
   function addMeasurement() {
     var input = document.getElementById('measInput');
     var name = input.value.trim();
