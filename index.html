@@ -208,13 +208,13 @@
       <!-- BARCODE SCANNER -->
       <div id="barcodeScanner" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:999;">
         <div style="position:absolute; top:16px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:center;">
-          <span style="color:white; font-size:14px; font-weight:800;">SCAN BARCODE — Point at Job # or P/N barcode</span>
+          <span style="color:white; font-size:14px; font-weight:800;">SCAN BOX LABEL — J.O.# first, then P/N</span>
           <button onclick="stopBarcodeScanner()" style="background:var(--red); color:white; border:none; border-radius:8px; padding:8px 14px; font-weight:800; font-size:12px; cursor:pointer;">✕ CLOSE</button>
         </div>
         <video id="barcodeVideo" style="width:100%; height:100%; object-fit:cover;"></video>
         <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; height:120px; border:3px solid var(--green); border-radius:8px; box-shadow:0 0 0 2000px rgba(0,0,0,0.5);"></div>
         <div style="position:absolute; bottom:40px; left:0; right:0; text-align:center; color:white; font-size:12px; font-weight:700; opacity:0.8;">
-          Scan Job # barcode first, then P/N barcode
+          Step 1: Scan J.O.# barcode on box → Step 2: Scan P/N barcode on box
         </div>
         <div id="barcodeResult" style="position:absolute; bottom:80px; left:16px; right:16px; background:var(--green); color:white; padding:10px; border-radius:8px; text-align:center; font-weight:800; display:none;"></div>
       </div>
@@ -242,7 +242,7 @@
       <div class="field-row">
         <div class="field">
           <label>Part / Spec #</label>
-          <input type="text" id="partNum" placeholder="Part number">
+          <input type="text" id="partNum" placeholder="Part number" onblur="lookupPartName(this.value)" onchange="lookupPartName(this.value)">
         </div>
         <div class="field">
           <label>Part Description</label>
@@ -1166,27 +1166,37 @@
             var text = result.getText();
             var resultDiv = document.getElementById('barcodeResult');
 
-            if (scanCount === 0) {
-              // First scan = Job #
+            var jobNum = document.getElementById('jobNum').value;
+            var partNum = document.getElementById('partNum').value;
+
+            // Smart detection — DS- prefix = Job #, everything else = Part #
+            var isJobNum = text.match(/^(DS|DL|WO)-/i) || scanCount === 0;
+
+            if (!jobNum && isJobNum) {
+              // Fill Job #
               document.getElementById('jobNum').value = text;
-              resultDiv.textContent = 'Job #: ' + text + ' ✅ Now scan P/N barcode';
+              resultDiv.style.background = '#1D4ED8';
               resultDiv.style.display = 'block';
+              resultDiv.textContent = 'J.O.#: ' + text + ' ✅ Now scan P/N barcode';
               scanCount = 1;
-              // Short pause before next scan
               setTimeout(function() {
-                resultDiv.textContent = 'Ready for P/N barcode...';
+                resultDiv.textContent = 'Ready — scan P/N barcode on box...';
               }, 2000);
-            } else if (scanCount === 1 && text !== document.getElementById('jobNum').value) {
-              // Second scan = Part #
+            } else if (!partNum && text !== document.getElementById('jobNum').value) {
+              // Fill Part #
               document.getElementById('partNum').value = text;
-              resultDiv.textContent = 'P/N: ' + text + ' ✅ Done!';
+              lookupPartName(text);
               resultDiv.style.background = '#16A34A';
               resultDiv.style.display = 'block';
-              // Auto close after success
+              resultDiv.textContent = 'P/N: ' + text + ' ✅ All done!';
               setTimeout(function() {
                 stopBarcodeScanner();
-                showToast('success', 'Job # and P/N scanned! Add Tool # and tap Add to Round.');
+                showToast('success', 'J.O.# and P/N scanned! Pick status and add to round.');
               }, 1500);
+            } else if (jobNum && partNum) {
+              // Both already filled — close scanner
+              stopBarcodeScanner();
+              showToast('success', 'Already scanned! Pick status and add to round.');
             }
           }
         });
@@ -1206,6 +1216,119 @@
       barcodeReader = null;
     }
     document.getElementById('barcodeScanner').style.display = 'none';
+  }
+
+  // ── PARTS DATABASE ───────────────────────────────────────────────
+  const PARTS_DB = {
+    "M008-BK-A": "PLUG -A, NUT, SWEP, BLACK (MOLDED WITH PLUG-B BOLT) (VIRGIN MATERIAL ONLY)",
+    "M008-BK-B": "PLUG -B, BOLT, SWEP, BLACK (MOLDED WITH PLUG-A NUT) (VIRGIN MATERIAL ONLY)",
+    "03107693": "BOLT, LONG, PLASTIC L-BOLT, LOCKING HEX HD, BLACK (FOR 1620,1419,1320,1111,G1 LIDS)",
+    "03107769": "BOLT, SHORT, PLASTIC L-BOLT, LOCKING HEX HD, BLACK (FOR 912 GLB LIDS)",
+    "03007734-MN": "LOGO DISK, METRONET / USA (BLACK), MOLDED",
+    "03007734-366": "LOGO DISK, WYYERD FIBER / USA (BLACK), MOLDED",
+    "03007734-B": "LOGO DISK, BROADBAND / USA (BLACK), MOLDED",
+    "03007734-FRN": "LOGO DISK, FRONTIER / USA (BLACK), MOLDED",
+    "03007734-N": "LOGO DISK, CHANNELL/MADE IN USA (NO LOGO), BLACK, MOLDED",
+    "03507734-MN": "LOGO DISK, METRONET / USA (GRAY), MOLDED",
+    "03507734-C": "LOGO DISK, COMCAST / USA (GRAY), MOLDED",
+    "03507734-131": "LOGO DISK, TDS TELECOM / USA (GRAY), MOLDED",
+    "03507734-229": "LOGO DISK, MMI / USA (GRAY), MOLDED",
+    "03507734-825": "LOGO DISK, CMMI / USA LOGO (GRAY), MOLDED",
+    "03507734-D2": "LOGO DISK, SPECTRUM / USA (GRAY), MOLDED",
+    "03507734-700": "LOGO DISK, WIRE 3 FIBER OPTIC INTERNET / USA (GRAY), MOLDED",
+    "03507734-N": "LOGO DISK, CHANNELL/MADE IN USA (NO LOGO), GRAY, MOLDED",
+    "03507734-FO": "LOGO DISK, FIBER OPTIC CABLE /USA (GRAY), MOLDED",
+    "2220-00140-06": "PIVOT, UNIVERSAL SPLICE TRAY, BLACK",
+    "2220-00128-06": "ADAPTER BULKHEAD, UNIV.SPLICE TRAY, BLACK",
+    "2230-00002-06": "BRANCH CTM CLIP, G5N GRAY",
+    "2220-00146-06": "FIBER ORGANIZER, UNIVERSAL SPLICE TRAY, GRAY",
+    "03007874": "CAP, PLASTIC TUBE END (BLACK)",
+    "03007875": "COLLAR, PLASTIC, TUBE, (BLACK)",
+    "03127280": "COVER PLATE, SELF LOCK PLASTIC (LB1) BLACK",
+    "03127571": "HOUSING, SELF LOCK HEX HEAD PLASTIC (LB1, LH1) BLACK",
+    "03L07734-308": "LOGO DISK, MAINSTREAM FIBER, USA (ORANGE), MOLDED",
+    "03L07734-720": "LOGO DISK, LUMEN / USA (ORANGE), MOLDED",
+    "03L07734-ZAYO": "LOGO DISK, ZAYO 1-866-236-2824 / USA (ORANGE), MOLDED",
+    "03L07734-532": "LOGO DISK, INTREPID / USA (ORANGE), MOLDED",
+    "03L07734-BLANK": "LOGO DISK, TOTAL BLANK-NO LOGOS (ORANGE), MOLDED",
+    "03H07734-261": "LOGO DISK, LUMOS / USA (PURPLE), MOLDED",
+    "03109200": "PLUG, .875 HOLE BLK W/MEMBRANE WINTERIZED DROP APPLICATION",
+    "3220-00043-06": "COVER, 6\" ROUND TURTLE NID, GREY",
+    "03109250": "PLUG, 1.125 HOLE BLK w/MEMBRANE (WINTERIZED DROP)",
+    "03M07734-672": "LOGO DISK, FIBERLIGHT / USA (LIME GREEN), MOLDED",
+    "2220-00126-06": "60mm SPLITTER HOLDER, UNIVERSAL SPLICE TRAY, GRAY",
+    "2220-00124-06": "12-SINGLE SPLICE HOLDER, UNIVERSAL SPLICE TRAY, GRAY",
+    "SLT15000580": "KEY, SELF LOCK SPECIAL LB1/LG1 (M7394/9882/9452 MOLDED) (ACCESSORY - SOLD EACH)",
+    "SLTT3LH1": "KEY, SELF LOCK 3/8HEX + 7/16HEX (ACCESSORY-EACH) M7394/9468/9467 BLACK",
+    "03107692-M": "WEDGE, PLASTIC, BLACK, MODIFIED FOR SELF-LOCK",
+    "03107692": "WEDGE, PLASTIC, BLACK (FOR GLB LIDS)",
+    "03117544": "SPACER, SELF LOCK BLACK (FROM M043 W/7545)",
+    "03007682": "BLOCK, SHORT GLB L-BOLT (FROM M059)",
+    "03007683": "BLOCK, LONG GLB L-BOLT (FROM M059)",
+    "M013-BFBK": "PLUG-A/PLUG-B, BRANCH PORT (BLK) BLOWN FIBER (VIRGIN MATERIAL ONLY)",
+    "3220-00036-06": "PLUG, PICK HOLE, 4860 SHIELD LID, RUBBER, GRAY",
+    "3220-00041-06": "FIBER TRAY, 6\" ROUND TURTLE NID,GREY",
+    "2230-00010-08": "CLAMP HANDLE, G5N BLACK",
+    "2230-00001-06": "CTM CLIP, STALK-MOUNT UNIVERSAL, GRAY",
+    "03127278": "COVER PLATE, SELF LOCK HEX HD PLASTIC (LH1) BLACK",
+    "03007735": "KEEPER BLOCK, L-BOLT, STANDARD & SELF LOCK (BLACK ABS)",
+    "2230-00009-08": "CLAMP LATCH, G5N BLACK",
+    "3220-00042-06": "BASE, 6\" ROUND TURTLE NID, GREY",
+    "3220-00020-06": "CUP, PICK HOLE, 1212-3048 SHIELD, ABS, GRAY",
+    "2220-00127-06": "ADAPTER BULKHEAD COVER, UNIVERSAL SPLICE TRAY, GRAY",
+    "2220-00141-06": "CENTRAL STALK, G5N GRAY",
+    "3220-00011-08": "SELF-LOCK COVER, ABS BLACK (FOR 1111)",
+    "03227839-B": "GLB LID ONLY, 912, BROADBAND, GRN (MOLDED LID ONLY)",
+    "GLB91B11": "GLB LID ASSY, 912, BROADBAND, GRN, L-BOLT",
+    "03227839D-6": "GLB DROP IN LID, 912, CHORUS/TELECOM, GRN (MOLDED LID ONLY)",
+    "03127493": "RECEIVER, SELF LOCK BUDGET PED",
+    "3220-00021-06": "PLUG, PICK HOLE, 1212-3048, SHIELD, RUBBER, GRAY",
+    "03506091": "PLUG FOR SHIELD L-BOLT HOLE (RUBBER) GREY",
+    "03506091-ABS": "PLUG FOR L-BOLT HOLE, ABS GREY (FOR SHIELD LIDS)",
+    "2220-00147-00": "FA, SELF-LOCK MECHANISM, FOR 1111 AND 14\"HRV LIDS",
+    "M080-BK-1": "FLOATING NUT (BLACK) (FOR USE W/M080-BK-2 RETAINER)",
+    "M080-BK-2": "FLOATING NUT RETAINER (BLACK) (FOR USE W/M080-BK-1 NUT)",
+    "3220-00017-08": "SA, HEAVY SLIDE, SELF LOCK, ABS BLACK",
+    "2230-00005-08": "BRANCHING BASE, G5N BLACK",
+    "2220-00129-06": "SLACK BASKET, G5N GRAY",
+    "3220-00025-06": "CENTRAL STALK, G4N GREY",
+    "2210-10594-09": "FA, LID, 1620, SOLID,DK GRN, HDPE, L-BOLT (NO LOGO INSTALLED)",
+    "2230-00004-08": "TERMINAL BASE, G5N BLACK",
+    "03227728": "PLUG, FOR FTTP SPLIT LIDS WITH HOLE FOR 1212, GREEN",
+    "3200-00025-08": "VERTICAL RACK, PLASTIC, 14-5/8\", BLACK (FOR ROBOTIC ASSY, 18\"D VAULTS)",
+    "03007949": "VERTICAL RACK, PLASTIC, 32\" (FOR 36\"D BULK) BLACK",
+    "03007824": "VERTICAL RACK, PLASTIC, 20.5\" (FOR 24\"D BULK) BLACK",
+    "2220-00139-06": "SPLICE TRAY, UNIVERSAL, GRAY, G5N/YJ",
+    "03007970": "BASE, 9\" BLOWN FIBER BLACK (w/INSERTS)",
+    "3220-00016-08": "SA, MOUNTING BLOCK,2\" SMC LID, SELF LOCK, ABS BLACK",
+    "2230-00007-08": "CLAMP-A, G5N BLACK",
+    "2230-00008-08": "CLAMP-B, G5N BLACK",
+    "03107848": "COVER, 615 BMT/FIBER BLACK (VIRGIN MATERIAL ONLY)",
+    "03127042": "COVER, OUTER 900 SERIES  BLACK",
+    "2230-00021-08": "CLAMP-A, G4N BLACK",
+    "2230-00006-08": "DOME, G5N BLACK",
+    "3200-00029-08": "BRIDGE, 4860, 48\"D, BLACK",
+    "3200-00028-08": "BRIDGE, 4860, 36\"D, BLACK",
+    "2230-00019-08": "DOME, G4N BLACK",
+    "2210-11445-09": "FA, LID KIT, 1111 GRN PLASTIC, SELF-LOCK (NO LOGO INSTALLED)",
+    "03227655-L": "LID, HALF SPLIT L-BOLT, DK GRN, FTTP 1730",
+    "2210-11445-10": "FA, LID KIT, 1111 BEIGE PLASTIC, SELF-LOCK (NO LOGO INSTALLED)",
+    "2200-00196-00": "FA, HRV1418 VAULT ASSEMBLY FOR PEDESTALS",
+    "GLB173018J11": "GLB BODY ONLY, BLACK, HDPE, APPLIED-STYLE",
+    "190033": "TRAY/ SINGLE (12-FIBRE)",
+    "GLB14191T11": "GLB LID ASSY, 1419, TELECOM, GRN, L-BOLT",
+    "2230-00020-08": "BASE, G4N BLACK",
+    "3200-00032-07": "COLLAR, 10\" HRP (MOLDED) LIGHT GREEN",
+    "GLBD91611": "GLB LID ASSY, 912 DROP-IN (CHORUS/GREEN/L-BOLT)"
+};
+
+  // Auto-fill Part Name when Part # is scanned or typed
+  function lookupPartName(partNum) {
+    var name = PARTS_DB[partNum.trim().toUpperCase()] || PARTS_DB[partNum.trim()] || '';
+    if (name) {
+      document.getElementById('partName').value = name;
+      showToast('success', 'Part name found: ' + name.substring(0, 40) + '...');
+    }
   }
 
   // ── INIT ─────────────────────────────────────────────────────────
