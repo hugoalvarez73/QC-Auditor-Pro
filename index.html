@@ -204,14 +204,34 @@
     <div class="card-body">
 
       <input type="file" id="scanFile" accept="image/*" capture="environment" style="display:none" onchange="handleScan(this)">
-      <button class="btn-scan" onclick="document.getElementById('scanFile').click()" id="scanBtn">
-        📷 AUTO-SCAN WORK ORDER REPORT
-      </button>
+      
+      <!-- BARCODE SCANNER -->
+      <div id="barcodeScanner" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:999;">
+        <div style="position:absolute; top:16px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:white; font-size:14px; font-weight:800;">SCAN BARCODE — Point at Job # or P/N barcode</span>
+          <button onclick="stopBarcodeScanner()" style="background:var(--red); color:white; border:none; border-radius:8px; padding:8px 14px; font-weight:800; font-size:12px; cursor:pointer;">✕ CLOSE</button>
+        </div>
+        <video id="barcodeVideo" style="width:100%; height:100%; object-fit:cover;"></video>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; height:120px; border:3px solid var(--green); border-radius:8px; box-shadow:0 0 0 2000px rgba(0,0,0,0.5);"></div>
+        <div style="position:absolute; bottom:40px; left:0; right:0; text-align:center; color:white; font-size:12px; font-weight:700; opacity:0.8;">
+          Scan Job # barcode first, then P/N barcode
+        </div>
+        <div id="barcodeResult" style="position:absolute; bottom:80px; left:16px; right:16px; background:var(--green); color:white; padding:10px; border-radius:8px; text-align:center; font-weight:800; display:none;"></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <button class="btn-scan" onclick="document.getElementById('scanFile').click()" id="scanBtn" style="font-size:11px; padding:12px 8px;">
+          📷 SCAN WORK ORDER
+        </button>
+        <button class="btn-scan" onclick="startBarcodeScanner()" id="barcodeBtn" style="font-size:11px; padding:12px 8px; background:linear-gradient(135deg, #1D4ED8 0%, #1E3A8A 100%);">
+          📱 SCAN BARCODE
+        </button>
+      </div>
 
       <div class="section-label">Job Details</div>
       <div class="field-row">
         <div class="field">
-          <label>Work Order # <span class="req">*</span></label>
+          <label>Work Order # <span class="req">*</span> <span style="font-weight:500;font-size:9px;text-transform:none;color:var(--muted)">(optional if Down/Mold Chg)</span></label>
           <input type="text" id="jobNum" placeholder="e.g. 1234567">
         </div>
         <div class="field">
@@ -350,6 +370,7 @@
       <div class="round-list" id="roundList"></div>
       <button class="btn btn-success" onclick="syncToSheet()" id="syncBtn">🚀 SYNC TO EXCEL</button>
       <button class="btn btn-secondary" onclick="emailReport()" style="margin-top:0;">📧 EMAIL REPORT TO MYSELF</button>
+      <button class="btn btn-secondary" onclick="exportToExcel()" style="margin-top:0;border-color:#16A34A;color:#16A34A;">📊 EXPORT TO EXCEL</button>
     </div>
   </div>
 
@@ -366,9 +387,12 @@
 
 <div class="scan-counter">AI Scans: <span id="scanCount">0</span>/250</div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
   // ── CONFIG ───────────────────────────────────────────────────────
-  const GEMINI_KEY = 'AQ.Ab8RN6JOSQtR7pU2511igQRe7gvhIkC4pdnxra21Dgcu0mKwiQ';
+  const GEMINI_KEY = 'AIzaSyAjR2V4gHZskSO1zTEyqN-jZcgPyRAS9mY';
   const POWER_AUTOMATE_URL = 'PASTE_YOUR_POWER_AUTOMATE_URL_HERE';
   const NOTIFY_EMAILS = [
     'halvarez@channell.com'
@@ -516,8 +540,19 @@
       if (!res.ok) throw new Error('API ' + res.status);
       return res.json();
     }).then(function(data) {
-      var text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) ? data.candidates[0].content.parts[0].text : '{}';
-      var parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      // Check for API errors
+      if (data.error) {
+        showToast('error', 'API Error: ' + data.error.message.substring(0, 80));
+        return;
+      }
+      if (!data.candidates || data.candidates.length === 0) {
+        showToast('error', 'No response from AI. Check API key.');
+        return;
+      }
+      var text = data.candidates[0].content.parts[0].text || '{}';
+      var parsed = {};
+      try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); } 
+      catch(e) { showToast('error', 'Could not parse response. Try again.'); return; }
       if (parsed.WorkNumber) document.getElementById('jobNum').value = parsed.WorkNumber;
       if (parsed.partNumber) document.getElementById('partNum').value = parsed.partNumber;
       if (parsed.partName) document.getElementById('partName').value = parsed.partName;
@@ -526,7 +561,8 @@
       showToast('success', 'Report scanned! Verify fields then add to round.');
     }).catch(function(err) {
       console.error(err);
-      showToast('error', 'Could not read report. Enter manually.');
+      var errMsg = err ? err.toString() : 'Unknown error';
+      showToast('error', 'Scan failed: ' + errMsg.substring(0, 80));
     }).finally(function() {
       btn.innerHTML = '📷 AUTO-SCAN WORK ORDER REPORT';
       btn.disabled = false;
@@ -792,8 +828,12 @@
     var jobNum = document.getElementById('jobNum').value.trim();
     var machineNum = document.getElementById('machineNum').value.trim();
     if (!auditor) { showToast('error', 'Enter your name first.'); return; }
-    if (!jobNum) { showToast('error', 'Work Order # is required.'); return; }
     if (!machineNum) { showToast('error', 'Tool / Machine # is required.'); return; }
+    // Work Order only required when machine is UP
+    if (currentStatus === 'Up' && !jobNum) { 
+      showToast('error', 'Work Order # is required for running machines.'); 
+      return; 
+    }
 
     if (ncActive && !validateNCPF()) return;
 
@@ -836,6 +876,10 @@
     round.push(entry);
     renderRound();
     clearForm();
+    // Auto-save to localStorage as backup
+    try {
+      localStorage.setItem('currentRound', JSON.stringify(round));
+    } catch(e) {}
     showToast('success', 'Added to round — ' + round.length + ' inspection' + (round.length > 1 ? 's' : '') + ' total.');
   }
 
@@ -927,6 +971,122 @@
     showToast('success', 'Email app opened — just hit Send!');
   }
 
+  // ── EXPORT TO EXCEL (.xlsx with 2 tabs) ─────────────────────────
+  function exportToExcel() {
+    // Get all saved inspection data
+    var allData = [];
+    try { allData = JSON.parse(localStorage.getItem('allInspections') || '[]'); } catch(e) { allData = []; }
+
+    // Add current round
+    var dept = document.getElementById('dept').value;
+    var shift = document.getElementById('shift').value;
+    var roundNum = document.getElementById('round').value;
+    var auditor = document.getElementById('auditor').value;
+
+    var currentData = round.map(function(e) {
+      return {
+        Date: e.date,
+        Time: e.time,
+        Auditor: auditor,
+        Department: dept,
+        Shift: shift,
+        Round: roundNum,
+        WorkOrder: e.jobNum,
+        PartNumber: e.partNum,
+        PartName: e.partName,
+        ToolMachine: e.machineNum,
+        Status: e.status,
+        Measurements: e.measSummary || '',
+        NonConforming: e.isNC ? 'Yes' : 'No',
+        NCPFNumber: e.ncpfNumber || '',
+        HasPhoto: e.hasPhoto,
+        Notes: e.notes
+      };
+    });
+
+    var allInspections = allData.concat(currentData);
+
+    if (allInspections.length === 0 && openNCPFs.length === 0) {
+      showToast('error', 'No data to export yet.');
+      return;
+    }
+
+    // ── TAB 1: AUDIT ROUND LOG ──
+    var roundHeaders = [
+      'Date', 'Time', 'Auditor', 'Department', 'Shift', 'Round',
+      'WorkOrder', 'PartNumber', 'PartName', 'ToolMachine',
+      'Status', 'Measurements', 'NonConforming', 'NCPFNumber', 'HasPhoto', 'Notes'
+    ];
+
+    var roundRows = [roundHeaders].concat(allInspections.map(function(r) {
+      return roundHeaders.map(function(h) { return r[h] || ''; });
+    }));
+
+    // ── TAB 2: NCPF LOG ──
+    var ncpfHeaders = [
+      'NCPF#', 'Date Found', 'Time', 'Generated By', 'Department',
+      'Area Responsible', 'Shift', 'Work Order', 'Part #', 'Part Name',
+      'Tool/Machine', 'Problem', 'Trace Code', 'Summary',
+      'Material Type', 'Qty Affected', 'Supervisor',
+      'Status', 'Disposition', 'Approved By', 'Is Manager',
+      'Justification', 'Rework Instructions', 'Date Closed'
+    ];
+
+    var ncpfRows = [ncpfHeaders].concat(openNCPFs.map(function(n) {
+      return [
+        n.ncpfNumber || '',
+        n.date || '',
+        n.time || '',
+        n.generatedBy || '',
+        n.department || '',
+        n.areaResponsible || '',
+        n.shift || '',
+        n.workOrder || '',
+        n.partNum || '',
+        n.partName || '',
+        n.toolNumber || '',
+        n.problem || '',
+        n.traceCode || '',
+        n.summary || '',
+        n.matType || '',
+        n.qty || '',
+        n.supervisor || '',
+        n.status || '',
+        n.disposition || 'Awaiting Disposition',
+        n.approvedBy || '',
+        n.isManager || '',
+        n.justification || '',
+        n.reworkInstructions || '',
+        n.closedDate || ''
+      ];
+    }));
+
+    // ── BUILD WORKBOOK ──
+    var wb = XLSX.utils.book_new();
+
+    // Tab 1 — Audit Round Log
+    var ws1 = XLSX.utils.aoa_to_sheet(roundRows);
+    // Style header row width
+    ws1['!cols'] = roundHeaders.map(function(h) {
+      return { wch: h === 'PartName' || h === 'Notes' ? 30 : h === 'WorkOrder' ? 15 : 12 };
+    });
+    XLSX.utils.book_append_sheet(wb, ws1, 'Audit Round Log');
+
+    // Tab 2 — NCPF Log
+    var ws2 = XLSX.utils.aoa_to_sheet(ncpfRows);
+    ws2['!cols'] = ncpfHeaders.map(function(h) {
+      return { wch: h === 'Problem' || h === 'Justification' || h === 'Summary' ? 35 : 15 };
+    });
+    XLSX.utils.book_append_sheet(wb, ws2, 'NCPF Log');
+
+    // ── DOWNLOAD ──
+    var date = new Date().toLocaleDateString('en-US').replace(/\//g, '-');
+    var filename = 'QC-Auditor-Pro-' + date + '.xlsx';
+    XLSX.writeFile(wb, filename);
+
+    showToast('success', 'Excel file downloaded with 2 tabs!');
+  }
+
   // ── SYNC TO EXCEL ─────────────────────────────────────────────────
   function syncToSheet() {
     if (round.length === 0) { showToast('error', 'No inspections to sync.'); return; }
@@ -959,6 +1119,26 @@
       btn.innerHTML = '🚀 SYNC TO EXCEL';
       btn.disabled = false;
       if (failed === 0) {
+        // Save to local storage before clearing
+        var saved = [];
+        try { saved = JSON.parse(localStorage.getItem('allInspections') || '[]'); } catch(e) {}
+        var dept = document.getElementById('dept').value;
+        var shift = document.getElementById('shift').value;
+        var roundNum = document.getElementById('round').value;
+        var auditor = document.getElementById('auditor').value;
+        round.forEach(function(e) {
+          saved.push({
+            Date: e.date, Time: e.time, Auditor: auditor,
+            Department: dept, Shift: shift, Round: roundNum,
+            WorkOrder: e.jobNum, PartNumber: e.partNum, PartName: e.partName,
+            ToolMachine: e.machineNum, Status: e.status,
+            Measurements: e.measSummary || '',
+            NonConforming: e.isNC ? 'Yes' : 'No',
+            NCPFNumber: e.ncpfNumber || '',
+            HasPhoto: e.hasPhoto, Notes: e.notes
+          });
+        });
+        localStorage.setItem('allInspections', JSON.stringify(saved));
         showToast('success', 'All ' + success + ' entries synced to Excel!');
         round = []; renderRound();
       } else {
@@ -967,7 +1147,81 @@
     });
   }
 
+  // ── BARCODE SCANNER ──────────────────────────────────────────────
+  var barcodeReader = null;
+  var barcodeStream = null;
+  var scanCount = 0; // 0 = waiting for job#, 1 = waiting for P/N
+
+  function startBarcodeScanner() {
+    var scanner = document.getElementById('barcodeScanner');
+    scanner.style.display = 'block';
+    scanCount = 0;
+    document.getElementById('barcodeResult').style.display = 'none';
+
+    try {
+      var codeReader = new ZXing.BrowserMultiFormatReader();
+      barcodeReader = codeReader;
+
+      codeReader.listVideoInputDevices().then(function(devices) {
+        var deviceId = devices.length > 0 ? devices[devices.length - 1].deviceId : undefined;
+
+        codeReader.decodeFromVideoDevice(deviceId, 'barcodeVideo', function(result, err) {
+          if (result) {
+            var text = result.getText();
+            var resultDiv = document.getElementById('barcodeResult');
+
+            if (scanCount === 0) {
+              // First scan = Job #
+              document.getElementById('jobNum').value = text;
+              resultDiv.textContent = 'Job #: ' + text + ' ✅ Now scan P/N barcode';
+              resultDiv.style.display = 'block';
+              scanCount = 1;
+              // Short pause before next scan
+              setTimeout(function() {
+                resultDiv.textContent = 'Ready for P/N barcode...';
+              }, 2000);
+            } else if (scanCount === 1 && text !== document.getElementById('jobNum').value) {
+              // Second scan = Part #
+              document.getElementById('partNum').value = text;
+              resultDiv.textContent = 'P/N: ' + text + ' ✅ Done!';
+              resultDiv.style.background = '#16A34A';
+              resultDiv.style.display = 'block';
+              // Auto close after success
+              setTimeout(function() {
+                stopBarcodeScanner();
+                showToast('success', 'Job # and P/N scanned! Add Tool # and tap Add to Round.');
+              }, 1500);
+            }
+          }
+        });
+      }).catch(function(err) {
+        showToast('error', 'Camera error: ' + err.message);
+        stopBarcodeScanner();
+      });
+    } catch(e) {
+      showToast('error', 'Barcode scanner not available. Use manual entry.');
+      stopBarcodeScanner();
+    }
+  }
+
+  function stopBarcodeScanner() {
+    if (barcodeReader) {
+      barcodeReader.reset();
+      barcodeReader = null;
+    }
+    document.getElementById('barcodeScanner').style.display = 'none';
+  }
+
   // ── INIT ─────────────────────────────────────────────────────────
+  // Restore round if page was refreshed
+  try {
+    var savedRound = JSON.parse(localStorage.getItem('currentRound') || '[]');
+    if (savedRound.length > 0) {
+      round = savedRound;
+      renderRound();
+      showToast('info', 'Restored ' + round.length + ' inspection(s) from last session.');
+    }
+  } catch(e) {}
   renderOpenNCPFs();
 </script>
 </body>
