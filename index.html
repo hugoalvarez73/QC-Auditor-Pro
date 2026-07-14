@@ -1158,10 +1158,11 @@
       var codeReader = new ZXing.BrowserMultiFormatReader();
       barcodeReader = codeReader;
 
-      codeReader.listVideoInputDevices().then(function(devices) {
-        var deviceId = devices.length > 0 ? devices[devices.length - 1].deviceId : undefined;
-
-        codeReader.decodeFromVideoDevice(deviceId, 'barcodeVideo', function(result, err) {
+      // Force back camera using environment facingMode
+      codeReader.decodeFromConstraints(
+        { video: { facingMode: 'environment' } },
+        'barcodeVideo',
+        function(result, err) {
           if (result) {
             var text = result.getText();
             var resultDiv = document.getElementById('barcodeResult');
@@ -1200,13 +1201,38 @@
             }
           }
         });
-      }).catch(function(err) {
-        showToast('error', 'Camera error: ' + err.message);
-        stopBarcodeScanner();
-      });
     } catch(e) {
       showToast('error', 'Barcode scanner not available. Use manual entry.');
       stopBarcodeScanner();
+    }
+  }
+
+  function handleBarcodeResult(text) {
+    var resultDiv = document.getElementById('barcodeResult');
+    var jobNum = document.getElementById('jobNum').value;
+    var partNum = document.getElementById('partNum').value;
+
+    var isJobNum = text.match(/^(DS|DL|WO)-/i) || (!jobNum && scanCount === 0);
+
+    if (!jobNum && isJobNum) {
+      document.getElementById('jobNum').value = text;
+      resultDiv.style.background = '#1D4ED8';
+      resultDiv.style.display = 'block';
+      resultDiv.textContent = 'J.O.#: ' + text + ' ✅ Now scan P/N barcode';
+      scanCount = 1;
+      setTimeout(function() {
+        resultDiv.textContent = 'Ready — scan P/N barcode...';
+      }, 2000);
+    } else if (!partNum && text !== document.getElementById('jobNum').value) {
+      document.getElementById('partNum').value = text;
+      lookupPartName(text);
+      resultDiv.style.background = '#16A34A';
+      resultDiv.style.display = 'block';
+      resultDiv.textContent = 'P/N: ' + text + ' ✅ All done!';
+      setTimeout(function() {
+        stopBarcodeScanner();
+        showToast('success', 'J.O.# and P/N scanned! Pick status and add to round.');
+      }, 1500);
     }
   }
 
@@ -1214,6 +1240,12 @@
     if (barcodeReader) {
       barcodeReader.reset();
       barcodeReader = null;
+    }
+    // Stop all video tracks
+    var video = document.getElementById('barcodeVideo');
+    if (video && video.srcObject) {
+      video.srcObject.getTracks().forEach(function(track) { track.stop(); });
+      video.srcObject = null;
     }
     document.getElementById('barcodeScanner').style.display = 'none';
   }
