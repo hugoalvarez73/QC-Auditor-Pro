@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
   <title>QC Auditor Pro</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     :root{
@@ -77,6 +77,15 @@
     .toast-error{background:var(--red-light);border-color:#FCA5A5;color:var(--red)}
     .toast-info{background:var(--green-light);border-color:var(--green-mid);color:var(--green-dark)}
     .scan-counter{position:fixed;bottom:16px;right:16px;background:white;border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:10px;font-weight:700;color:var(--muted);box-shadow:var(--shadow);z-index:50}
+    .scanner-modal{display:none;position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.92);padding:20px;overflow:auto}
+    .scanner-modal.open{display:block}
+    .scanner-shell{max-width:520px;margin:30px auto;background:white;border-radius:16px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+    .scanner-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+    .scanner-title{font-size:14px;font-weight:900;color:var(--text)}
+    .scanner-close{border:none;background:var(--red);color:white;border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer}
+    .scanner-help{font-size:12px;text-align:center;color:var(--muted);margin-top:10px;line-height:1.4}
+    #barcodeReader{width:100%;overflow:hidden;border-radius:12px}
+    #barcodeReader video{border-radius:12px}
     @keyframes spin{to{transform:rotate(360deg)}}
     .spin{display:inline-block;animation:spin .8s linear infinite}
     /* NC */
@@ -183,16 +192,13 @@
     </div>
     <div class="card-body">
       <!-- SCAN BUTTONS -->
-      <input type="file" id="jobBarcodeFile" accept="image/*" capture="environment" style="display:none" onchange="handleScan(this,'job')">
-      <input type="file" id="pnBarcodeFile" accept="image/*" capture="environment" style="display:none" onchange="handleScan(this,'pn')">
-      <input type="file" id="machineBarcodeFile" accept="image/*" capture="environment" style="display:none" onchange="handleScan(this,'machine')">
       <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <button class="btn-scan" style="background:linear-gradient(135deg,#1D4ED8,#1E3A8A);" onclick="document.getElementById('jobBarcodeFile').click()">
+        <button class="btn-scan" style="background:linear-gradient(135deg,#1D4ED8,#1E3A8A);" onclick="startBarcodeScanner('job')">
           📷 SCAN J.O.#
         </button>
-        <button class="btn-scan" style="background:linear-gradient(135deg,#16A34A,#14532D);" onclick="document.getElementById('pnBarcodeFile').click()">
+        <button class="btn-scan" style="background:linear-gradient(135deg,#16A34A,#14532D);" onclick="startBarcodeScanner('pn')">
           📷 SCAN P/N
         </button>
       </div>
@@ -207,7 +213,7 @@
           <label>Tool / Machine # <span class="req">*</span></label>
           <div style="display:flex;gap:6px;align-items:center;">
             <input type="text" id="machineNum" placeholder="e.g. IM-15" style="flex:1;">
-            <button onclick="document.getElementById('machineBarcodeFile').click()" style="background:var(--green);color:white;border:none;border-radius:8px;padding:11px 10px;font-size:14px;cursor:pointer;flex-shrink:0;">📷</button>
+            <button onclick="startBarcodeScanner('machine')" style="background:var(--green);color:white;border:none;border-radius:8px;padding:11px 10px;font-size:14px;cursor:pointer;flex-shrink:0;">📷</button>
           </div>
         </div>
       </div>
@@ -349,7 +355,18 @@
   </div>
 </main>
 
-<div class="scan-counter">AI Scans: <span id="scanCount">0</span>/250</div>
+<div id="scannerModal" class="scanner-modal" role="dialog" aria-modal="true" aria-labelledby="scannerTitle">
+  <div class="scanner-shell">
+    <div class="scanner-head">
+      <div id="scannerTitle" class="scanner-title">Scan Barcode</div>
+      <button type="button" class="scanner-close" onclick="stopBarcodeScanner()">Close</button>
+    </div>
+    <div id="barcodeReader"></div>
+    <p class="scanner-help">Hold the barcode inside the scanning area. The camera will close automatically after a successful scan.</p>
+  </div>
+</div>
+
+<div class="scan-counter">Barcode Scans: <span id="scanCount">0</span></div>
 
 <script>
   // ── CONFIG ────────────────────────────────────────────────────────
@@ -630,65 +647,192 @@
   }
 
   // ── SCAN HANDLER ──────────────────────────────────────────────────
-  function handleScan(input, type) {
-    var file = input.files[0];
-    if(!file) return;
-    showToast('info','Reading barcode...',0);
+  var html5QrCode = null;
+  var activeScanType = '';
+  var scanInProgress = false;
 
-    Tesseract.recognize(file,'eng').then(function(result){
-      var text = result.data.text.trim();
-      var lines = text.split('\n');
-      var found = '';
+  function startBarcodeScanner(type) {
+    if(typeof Html5Qrcode === 'undefined') {
+      showToast('error','Barcode scanner library did not load. Check the internet connection.');
+      return;
+    }
 
-      if(type==='job') {
-        for(var i=0;i<lines.length;i++){
-          var cleaned = lines[i].replace(/[^A-Z0-9\-]/gi,'').trim();
-          if(cleaned.match(/^(DS|DL)-\d{6,9}$/i)){
-            found = cleaned.toUpperCase();
-            break;
-          }
-        }
-        if(found){
-          document.getElementById('jobNum').value = found;
-          lookupByJob(found);
-        } else {
-          var manual = prompt('Could not read J.O.# barcode.\nEnter Work Order # manually (e.g. DS-2019428):');
-          if(manual&&manual.trim()){
-            var m = manual.trim().toUpperCase();
-            document.getElementById('jobNum').value = m;
-            lookupByJob(m);
-          } else {
-            showToast('error','Could not read barcode. Enter manually.');
-          }
-        }
-      } else if(type==='pn') {
-        var manual = prompt('Enter Part # from the work order:\n(e.g. M080-BK-1, GLB91B11, 03107693)');
-        if(manual&&manual.trim()){
-          var m = manual.trim().toUpperCase();
-          document.getElementById('partNum').value = m;
-          lookupPartName(m);
-        }
-      } else if(type==='machine') {
-        for(var i=0;i<lines.length;i++){
-          var cleaned = lines[i].replace(/[^A-Z0-9\-]/gi,'').trim();
-          if(cleaned.match(/^IM-?\d{1,2}$/i)){
-            found = cleaned.toUpperCase();
-            break;
-          }
-        }
-        if(found){
-          document.getElementById('machineNum').value = found;
-          showToast('success','Machine: '+found+' ✅');
-        } else {
-          var manual = prompt('Could not read machine barcode.\nEnter Machine # manually (e.g. IM-15):');
-          if(manual&&manual.trim()) document.getElementById('machineNum').value = manual.trim().toUpperCase();
-        }
-      }
-    }).catch(function(){
-      showToast('error','Could not read. Enter manually.');
+    if(html5QrCode && html5QrCode.isScanning) return;
+
+    activeScanType = type;
+    scanInProgress = false;
+
+    var titles = {
+      job:'Scan Work Order Barcode',
+      pn:'Scan Part Number Barcode',
+      machine:'Scan Machine Barcode'
+    };
+
+    document.getElementById('scannerTitle').textContent = titles[type] || 'Scan Barcode';
+    document.getElementById('scannerModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    html5QrCode = new Html5Qrcode('barcodeReader');
+
+    var scannerConfig = {
+      fps:10,
+      qrbox:function(viewfinderWidth,viewfinderHeight){
+        return {
+          width:Math.max(220,Math.floor(viewfinderWidth*0.85)),
+          height:Math.min(180,Math.max(100,Math.floor(viewfinderHeight*0.32)))
+        };
+      },
+      aspectRatio:1.777778,
+      disableFlip:false,
+      formatsToSupport:[
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.DATA_MATRIX
+      ]
+    };
+
+    html5QrCode.start(
+      {facingMode:{ideal:'environment'}},
+      scannerConfig,
+      function(decodedText){
+        if(scanInProgress) return;
+        scanInProgress = true;
+        processBarcode(decodedText,activeScanType);
+        stopBarcodeScanner();
+      },
+      function(){ /* Normal while searching for a barcode. */ }
+    ).catch(function(error){
+      console.error('Camera scanner error:',error);
+      cleanupScannerUI();
+      html5QrCode = null;
+      showToast('error','Camera could not start. Allow camera access and open the app through HTTPS.');
     });
-    input.value='';
   }
+
+  function cleanupScannerUI(){
+    document.getElementById('scannerModal').classList.remove('open');
+    document.body.style.overflow = '';
+    scanInProgress = false;
+    activeScanType = '';
+  }
+
+  function stopBarcodeScanner(){
+    cleanupScannerUI();
+
+    if(!html5QrCode) return;
+
+    var scanner = html5QrCode;
+    html5QrCode = null;
+
+    if(scanner.isScanning){
+      scanner.stop().then(function(){
+        try{scanner.clear();}catch(e){}
+      }).catch(function(error){
+        console.warn('Scanner stop error:',error);
+        try{scanner.clear();}catch(e){}
+      });
+    } else {
+      try{scanner.clear();}catch(e){}
+    }
+  }
+
+  function normalizeScannedValue(rawValue){
+    return String(rawValue||'')
+      .replace(/[\r\n\t]+/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+
+  function processBarcode(rawValue,type){
+    var value = normalizeScannedValue(rawValue);
+
+    if(!value){
+      showToast('error','The barcode did not contain readable data.');
+      return;
+    }
+
+    if(type==='job'){
+      var jobMatch = value.match(/(?:DS|DL)\s*-?\s*\d{6,9}/i);
+      if(!jobMatch){
+        showToast('error','Barcode read "'+value+'", but it is not a valid J.O. number.');
+        return;
+      }
+
+      var jobNumber = jobMatch[0].toUpperCase().replace(/\s+/g,'');
+      jobNumber = jobNumber.replace(/^(DS|DL)(\d)/,'$1-$2');
+      document.getElementById('jobNum').value = jobNumber;
+      lookupByJob(jobNumber);
+      showToast('success','Work Order: '+jobNumber+' ✅');
+    }
+    else if(type==='pn'){
+      var partNumber = value
+        .replace(/^P\/?N\s*[:#-]?\s*/i,'')
+        .replace(/^PART\s*(NUMBER|NO\.?|#)?\s*[:#-]?\s*/i,'')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g,'');
+
+      if(!partNumber){
+        showToast('error','No part number was found in the barcode.');
+        return;
+      }
+
+      document.getElementById('partNum').value = partNumber;
+      document.getElementById('partName').value = '';
+      lookupPartName(partNumber);
+
+      if(document.getElementById('partName').value){
+        showToast('success','Part Number: '+partNumber+' ✅');
+      } else {
+        showToast('info','Part Number scanned: '+partNumber+'. Description not found in the local database.');
+      }
+    }
+    else if(type==='machine'){
+      var machineMatch = value.match(/(?:IM|BM|SF|FM|SMC|M)\s*-?\s*\d{1,3}/i);
+      var machineNumber = machineMatch ? machineMatch[0].toUpperCase().replace(/\s+/g,'') : value.toUpperCase();
+      machineNumber = machineNumber.replace(/^([A-Z]+)(\d)/,'$1-$2');
+
+      if(!machineNumber){
+        showToast('error','No machine number was found in the barcode.');
+        return;
+      }
+
+      document.getElementById('machineNum').value = machineNumber;
+      showToast('success','Machine: '+machineNumber+' ✅');
+    }
+
+    increaseScanCount();
+  }
+
+  function increaseScanCount(){
+    var count = Number(localStorage.getItem('barcodeScanCount')||0)+1;
+    localStorage.setItem('barcodeScanCount',String(count));
+    var counter = document.getElementById('scanCount');
+    if(counter) counter.textContent = count;
+  }
+
+  (function restoreScanCount(){
+    var counter = document.getElementById('scanCount');
+    if(counter) counter.textContent = localStorage.getItem('barcodeScanCount')||'0';
+  })();
+
+  document.getElementById('scannerModal').addEventListener('click',function(event){
+    if(event.target===this) stopBarcodeScanner();
+  });
+
+  document.addEventListener('keydown',function(event){
+    if(event.key==='Escape'&&document.getElementById('scannerModal').classList.contains('open')){
+      stopBarcodeScanner();
+    }
+  });
 
   // ── PHOTO ─────────────────────────────────────────────────────────
   function handlePhoto(input){
@@ -913,7 +1057,7 @@
   // ── CLEAR FORM ────────────────────────────────────────────────────
   function clearForm(){
     ['jobNum','machineNum','partNum','partName','notes'].forEach(function(id){document.getElementById(id).value='';});
-    ['jobBarcodeFile','pnBarcodeFile','machineBarcodeFile','photoFile'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('photoFile').value='';
     currentPhoto='';
     document.getElementById('photoBtn').classList.remove('has-photo');
     document.getElementById('photoBtnText').textContent='Add Defect Photo';
