@@ -651,7 +651,7 @@
   var activeScanType = '';
   var scanInProgress = false;
 
-  function startBarcodeScanner(type) {
+  async function startBarcodeScanner(type) {
     if(typeof Html5Qrcode === 'undefined') {
       showToast('error','Barcode scanner library did not load. Check the internet connection.');
       return;
@@ -672,49 +672,82 @@
     document.getElementById('scannerModal').classList.add('open');
     document.body.style.overflow = 'hidden';
 
-    html5QrCode = new Html5Qrcode('barcodeReader');
+    try {
+      // Ask the browser for camera permission and obtain real camera IDs.
+      var cameras = await Html5Qrcode.getCameras();
 
-    var scannerConfig = {
-      fps:10,
-      qrbox:function(viewfinderWidth,viewfinderHeight){
-        return {
-          width:Math.max(220,Math.floor(viewfinderWidth*0.85)),
-          height:Math.min(180,Math.max(100,Math.floor(viewfinderHeight*0.32)))
-        };
-      },
-      aspectRatio:1.777778,
-      disableFlip:false,
-      formatsToSupport:[
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.CODE_93,
-        Html5QrcodeSupportedFormats.CODABAR,
-        Html5QrcodeSupportedFormats.ITF,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.DATA_MATRIX
-      ]
-    };
+      if(!cameras || cameras.length === 0) {
+        throw new Error('NotFoundError: No camera was detected by Chrome.');
+      }
 
-    html5QrCode.start(
-      {facingMode:{ideal:'environment'}},
-      scannerConfig,
-      function(decodedText){
-        if(scanInProgress) return;
-        scanInProgress = true;
-        processBarcode(decodedText,activeScanType);
-        stopBarcodeScanner();
-      },
-      function(){ /* Normal while searching for a barcode. */ }
-    ).catch(function(error){
+      // Prefer a rear/back/environment camera. Pixel phones may expose several rear lenses.
+      var rearCamera = cameras.find(function(camera){
+        return /back|rear|environment/i.test(camera.label || '');
+      }) || cameras[cameras.length - 1];
+
+      html5QrCode = new Html5Qrcode('barcodeReader', {
+        formatsToSupport:[
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.CODABAR,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.DATA_MATRIX
+        ],
+        verbose:false
+      });
+
+      var scannerConfig = {
+        fps:10,
+        // A fixed, conservative scan box avoids invalid-size errors on narrow phones.
+        qrbox:{width:250,height:120},
+        disableFlip:false,
+        experimentalFeatures:{useBarCodeDetectorIfSupported:true}
+      };
+
+      await html5QrCode.start(
+        rearCamera.id,
+        scannerConfig,
+        function(decodedText){
+          if(scanInProgress) return;
+          scanInProgress = true;
+          processBarcode(decodedText,activeScanType);
+          stopBarcodeScanner();
+        },
+        function(){ /* Normal while searching for a barcode. */ }
+      );
+
+    } catch(error) {
       console.error('Camera scanner error:',error);
       cleanupScannerUI();
+
+      if(html5QrCode) {
+        try { await html5QrCode.clear(); } catch(e) {}
+      }
       html5QrCode = null;
-      showToast('error','Camera could not start. Allow camera access and open the app through HTTPS.');
-    });
+
+      var detail = error && (error.name || error.message || String(error));
+      var message = 'Camera error: ' + detail;
+
+      if(/NotAllowed|Permission|denied/i.test(detail)) {
+        message = 'Chrome denied camera access for this site. Reset the site permission and choose Allow.';
+      } else if(/NotFound|DevicesNotFound/i.test(detail)) {
+        message = 'Chrome could not detect a camera on this device.';
+      } else if(/NotReadable|TrackStart|Could not start video source/i.test(detail)) {
+        message = 'The camera is busy. Close the Camera app and any other app using the camera, then try again.';
+      } else if(/Overconstrained|Constraint/i.test(detail)) {
+        message = 'The selected camera settings are not supported by this phone.';
+      } else if(/secure|https/i.test(detail)) {
+        message = 'Camera access requires a secure HTTPS page.';
+      }
+
+      showToast('error',message,8000);
+    }
   }
 
   function cleanupScannerUI(){
