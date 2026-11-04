@@ -6,6 +6,7 @@
   <title>QC Auditor Pro</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     :root{
@@ -143,6 +144,35 @@
     .email-row{display:flex;gap:8px;align-items:center}
     .email-input{flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;font-weight:600;outline:none}
     .email-send-btn{background:var(--green);color:white;border:none;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:inherit}
+
+    /* Desktop dashboard and mobile-friendly navigation */
+    .header-inner{max-width:1250px}.topnav{display:flex;gap:6px;flex-wrap:wrap}
+    .navbtn{border:0;background:transparent;color:#334155;padding:9px 12px;border-radius:9px;font-size:12px;font-weight:750;cursor:pointer}
+    .navbtn.active{background:#e6f6ec;color:#16813e}
+    main{max-width:1250px}.main-inspection{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px;align-items:start}
+    .inspect-left,.inspect-right{display:flex;flex-direction:column;gap:14px}
+    .inspect-right .card-body{font-size:12px;line-height:1.7}
+    .helper-step{display:flex;gap:12px;align-items:flex-start;margin:9px 0}.helper-num{display:grid;place-items:center;border-radius:50%;color:white;background:#1d4ed8;flex:0 0 28px;height:28px;font-weight:bold}
+    .tab-page{display:none}.tab-page.active{display:block}
+    .metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .metric{padding:18px;border-radius:12px;border:1px solid #dce9f4;background:#fff;box-shadow:var(--shadow)}
+    .metric-label{font-size:10px;font-weight:800;color:#24518e;letter-spacing:.7px;text-transform:uppercase}.metric-value{font-size:29px;font-weight:900;color:#172c4f;margin-top:5px}
+    .report-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.report-grid .card{min-width:0}
+    .report-title{font-size:12px;font-weight:900;color:#224f91;margin:0 0 14px}.chart-holder{position:relative;height:240px}
+    .filter-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end}
+    .report-table-wrap{width:100%;overflow:auto}.report-table{width:100%;border-collapse:collapse;font-size:11px;min-width:750px}
+    .report-table th{text-align:left;background:#edf5fd;color:#3b5675;padding:10px 9px}.report-table td{border-top:1px solid #e5eaf1;padding:9px;max-width:230px;word-break:break-word}
+    .pill{display:inline-flex;padding:4px 8px;border-radius:16px;font-weight:800;font-size:10px;background:#dcfce7;color:#166534}.pill.bad{background:#fee2e2;color:#b91c1c}
+    .choice-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.choice{border:1.5px solid #cbd5e1;padding:14px;border-radius:10px;background:white;font-weight:850;cursor:pointer}.choice.good.sel{border-color:#22c55e;background:#ebfdf1;color:#15803d}.choice.bad.sel{border-color:#ef4444;background:#fff0f0;color:#b91c1c}
+    .defect-box{display:none;padding:12px;border:1.5px solid #fecaca;background:#fff7f7;border-radius:12px;gap:10px;flex-direction:column}.defect-box.open{display:flex}
+    .field-hint{font-size:11px;color:#64748b;margin-top:5px}
+    .cavity-focus{background:#fff;border:2px solid #f59e0b;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+    .cavity-focus label{color:#92400e;font-size:12px}
+    .cavity-focus input{font-size:17px;border-color:#fcd34d;background:#fffbeb}
+    .cavity-focus input:focus{background:white;border-color:#d97706}
+    .trial-notice{padding:9px 12px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:12px;margin-bottom:12px;border:1px solid #fde68a}
+    @media(max-width:850px){.main-inspection{grid-template-columns:1fr}.inspect-right{display:none}.report-grid{grid-template-columns:1fr}.metric-grid{grid-template-columns:repeat(2,1fr)}.filter-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:600px){header{padding:10px}.header-inner{flex-wrap:wrap;gap:10px}.topnav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap}.navbtn{padding:8px;font-size:11px}.logo-sub{display:none}.field-row-3{grid-template-columns:1fr 1fr}.metric{padding:12px}.metric-value{font-size:24px}main{padding:10px}.filter-grid{grid-template-columns:1fr 1fr}}
   </style>
 </head>
 <body>
@@ -155,10 +185,19 @@
         <div class="logo-sub">Channell Commercial Corp</div>
       </div>
     </div>
+    <nav class="topnav" aria-label="Main navigation">
+      <button class="navbtn active" data-tab="inspection" onclick="showTab('inspection')">📋 Inspection</button>
+      <button class="navbtn" data-tab="history" onclick="showTab('history')">◷ History</button>
+      <button class="navbtn" data-tab="reports" onclick="showTab('reports')">📊 Reports</button>
+      <button class="navbtn" data-tab="export" onclick="showTab('export')">📄 Export</button>
+      <button class="navbtn" data-tab="settings" onclick="showTab('settings')">⚙ Settings</button>
+    </nav>
     <div class="live-badge"><div class="dot"></div><span id="liveTime"></span></div>
   </div>
 </header>
 <main>
+<div id="page-inspection" class="tab-page active"><div class="main-inspection"><div class="inspect-left">
+  <div class="trial-notice">LOCAL TEST VERSION — records are stored only in this browser. Export backups regularly. Supabase is not connected.</div>
   <!-- SESSION -->
   <div class="card">
     <div class="card-header"><span class="card-title">📝 Session Info</span></div>
@@ -259,6 +298,60 @@
         </div>
       </div>
 
+      <!-- NEW SAMPLE TRACKING -->
+      <div class="section-label">4. Inspection Sample</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="sampleQty">How many parts are you inspecting? <span class="req">*</span></label>
+          <input id="sampleQty" type="number" min="1" step="1" value="5">
+        </div>
+        <div class="field">
+          <label for="moldCavityCount">How many cavities in mold?</label>
+          <input id="moldCavityCount" type="number" min="1" step="1" placeholder="e.g. 8">
+        </div>
+      </div>
+      <div class="field-hint">Record the actual number of parts checked and the mold's cavity count (e.g. 8).</div>
+      <div class="field" style="padding:12px;border:1px solid var(--border);border-radius:12px;background:#f8fafc">
+        <label>Part weight — optional</label>
+        <div class="choice-row" style="margin-top:5px">
+          <button type="button" id="weight-na" class="choice good sel" onclick="setWeightMode('na')">N/A</button>
+          <button type="button" id="weight-yes" class="choice" onclick="setWeightMode('yes')">⚖ Record weight</button>
+        </div>
+        <div id="weightEntry" style="display:none;margin-top:10px">
+          <div class="field-hint" style="margin-bottom:8px">What does the weight specification call for?</div>
+          <div class="field-row">
+            <div class="field"><label for="weightSpecMin">Minimum weight (spec)</label><input id="weightSpecMin" type="number" min="0" step="any" placeholder="e.g. 0.245"></div>
+            <div class="field"><label for="weightSpecMax">Maximum weight (spec)</label><input id="weightSpecMax" type="number" min="0" step="any" placeholder="e.g. 0.255"></div>
+          </div>
+          <div class="field-row" style="margin-top:10px">
+            <div class="field"><label for="measuredWeight">Actual measured weight</label><input id="measuredWeight" type="number" min="0" step="any" placeholder="e.g. 0.250"></div>
+            <div class="field"><label for="weightUnit">Weight unit (spec and actual)</label><select id="weightUnit"><option value="lb">Pounds (lb)</option><option value="g">Grams (g)</option></select></div>
+          </div>
+          <div class="field-hint">Use the same selected unit for the specification and actual measurement. No automatic conversion or pass/fail.</div>
+        </div>
+      </div>
+      <div class="section-label" style="color:#dc2626">5. Did you find any defects? <span class="req">*</span></div>
+      <div class="choice-row">
+        <button type="button" id="def-no" class="choice good sel" onclick="setDefectChoice('No')">✅ No — all inspected parts good</button>
+        <button type="button" id="def-yes" class="choice bad" onclick="setDefectChoice('Yes')">🔴 Yes — defect found</button>
+      </div>
+      <div class="defect-box" id="defectBox">
+        <div class="field">
+          <label>How many defective parts? <span class="req">*</span></label>
+          <input type="number" id="defectQty" min="1" step="1" value="1">
+        </div>
+        <div class="cavity-focus">
+          <label for="cavity">🔢 Defective Cavity Number <span class="req">*</span></label>
+          <input id="cavity" list="cavitySuggestions" autocomplete="off" placeholder="Enter cavity # (e.g. 3)" aria-describedby="cavityHelp">
+          <datalist id="cavitySuggestions"><option value="Unknown"><option value="All"></datalist>
+          <div id="cavityHelp" class="field-hint">Record the cavity that made the defective part. If multiple cavities have different defects, make a separate inspection entry for each cavity. Use “Unknown” only when the cavity cannot be identified.</div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Trace Code <span class="req">*</span></label><input id="traceCode" placeholder="Enter or scan trace code"></div>
+          <div class="field"><label>Defect Type <span class="req">*</span></label><select id="defectType"><option value="">Select defect...</option><option>Short Shot</option><option>Flash</option><option>Dimension</option><option>Cosmetic</option><option>Sink Mark</option><option>Knit Line</option><option>Burn Mark</option><option>Contamination</option><option>Warping</option><option>Other</option></select></div>
+        </div>
+        <div class="field"><label>Defect Description <span class="req">*</span></label><textarea id="defectDesc" placeholder="Describe the defect or quality concern"></textarea></div>
+      </div>
       <!-- NC BUTTON -->
       <button class="nc-btn" id="ncBtn" onclick="toggleNC()">
         <span>🚨</span>
@@ -353,6 +446,34 @@
     </div>
     <div id="ncpfPanelList"></div>
   </div>
+</div>
+<aside class="inspect-right">
+  <div class="card"><div class="card-header"><span class="card-title">✅ Simple 3-Step Process</span></div><div class="card-body">
+  <div class="helper-step"><span class="helper-num" style="background:#f59e0b">1</span><div><b>How many parts are you inspecting?</b><div>Enter the actual sample size.</div></div></div>
+  <div class="helper-step"><span class="helper-num">2</span><div><b>Did you find any defects?</b><div>Select Yes or No.</div></div></div>
+  <div class="helper-step"><span class="helper-num" style="background:#ef4444">3</span><div><b>If yes, enter defect details.</b><div>Quantity, trace code, cavity, type, description.</div></div></div>
+  </div></div>
+  <div class="card"><div class="card-header"><span class="card-title">✅ When you select “No”</span></div><div class="card-body">No extra defect fields. All inspected sample parts are counted as good.</div></div>
+  <div class="card"><div class="card-header"><span class="card-title">🔴 When you select “Yes”</span></div><div class="card-body">Additional defect details appear so Quality can investigate the exact cavity and trace code.</div></div>
+  <div class="card"><div class="card-header"><span class="card-title">📊 Why this matters</span></div><div class="card-body">Correct sample defect rate, accurate cavity tracking, useful machine trends, and faster reporting.</div></div>
+</aside></div></div>
+<section id="page-history" class="tab-page"><div class="card"><div class="card-header"><span class="card-title">Inspection History</span></div><div class="card-body"><p class="field-hint">Saved inspections from this browser, including current round.</p><div class="field-row"><input id="historySearch" placeholder="Search part, machine, trace or cavity" oninput="renderHistory()"><select id="historyResult" onchange="renderHistory()"><option value="">All results</option><option>Pass</option><option>Defect</option></select></div><div class="report-table-wrap" id="historyTable"></div></div></div></section>
+<section id="page-reports" class="tab-page">
+ <div class="trial-notice">Live dashboard from inspection records saved in this browser — no sample figures.</div>
+ <h2 style="color:#142a51;margin-bottom:4px">📊 Quality Reports Dashboard</h2><p style="color:#64748b;margin-bottom:14px;font-size:13px">Analyze inspected samples, track defects, and monitor quality performance.</p>
+ <div class="card" style="margin-bottom:14px"><div class="card-header"><span class="card-title">⚑ Report Filters</span></div><div class="card-body"><div class="filter-grid">
+ <div class="field"><label>Department</label><select id="filterDept"><option value="">All Departments</option><option>Injection Molding</option><option>Structure Foam</option><option>Blow Mold</option><option>Fiber</option><option>Metals</option><option>SMC</option></select></div>
+ <div class="field"><label>Shift</label><select id="filterShift"><option value="">All Shifts</option><option>1st</option><option>2nd</option><option>3rd</option></select></div>
+ <div class="field"><label>From date</label><input type="date" id="filterFrom"></div><div class="field"><label>To date</label><input type="date" id="filterTo"></div>
+ <div class="field"><label>Machine / Part</label><input id="filterKeyword" placeholder="All" onkeydown="if(event.key==='Enter')renderReports()"></div>
+ </div><div style="display:flex;justify-content:flex-end;gap:10px"><button class="btn btn-secondary" style="width:auto" onclick="resetReportFilters()">Reset</button><button class="btn btn-primary" style="width:auto" onclick="renderReports()">Apply</button></div></div></div>
+ <div class="metric-grid"><div class="metric"><div class="metric-label">Total Inspections</div><div class="metric-value" id="mInspections">0</div></div><div class="metric"><div class="metric-label">Parts Inspected</div><div class="metric-value" id="mParts">0</div></div><div class="metric"><div class="metric-label">Defective Parts</div><div class="metric-value" id="mDefects">0</div></div><div class="metric"><div class="metric-label">Sample Defect Rate</div><div class="metric-value" id="mRate">0.00%</div></div></div>
+ <div class="card" style="margin-bottom:14px"><div class="card-body"><div class="report-title">Defect Trend Over Time</div><div class="chart-holder"><canvas id="trendChart"></canvas></div></div></div>
+ <div class="report-grid" style="margin-bottom:14px"><div class="card"><div class="card-body"><div class="report-title">Defects by Type</div><div class="chart-holder"><canvas id="typeChart"></canvas></div></div></div><div class="card"><div class="card-body"><div class="report-title">Defects by Machine</div><div class="chart-holder"><canvas id="machineChart"></canvas></div></div></div><div class="card"><div class="card-body"><div class="report-title">Top Cavity Issues</div><div class="chart-holder"><canvas id="cavityChart"></canvas></div></div></div></div>
+ <div class="card"><div class="card-header"><span class="card-title" style="color:#dc2626">⚠ Recent Non-Conforming Findings</span></div><div class="card-body"><div class="report-table-wrap" id="findingsTable"></div><button class="btn btn-secondary" onclick="showTab('export')">Export Filtered Results</button></div></div>
+</section>
+<section id="page-export" class="tab-page"><div class="card"><div class="card-header"><span class="card-title">📄 Export and Back Up</span></div><div class="card-body"><p>Download your entire browser history, open NCPFs, and current round as an Excel workbook.</p><button class="btn btn-primary" onclick="exportToExcel()">📊 Export All to Excel</button><button class="btn btn-secondary" onclick="exportFilteredCSV()">⬇ Export Filtered Reports as CSV</button><p class="field-hint">For the 30-day trial, save a copy every day. Browser storage can be cleared and is not shared across devices.</p></div></div></section>
+<section id="page-settings" class="tab-page"><div class="card"><div class="card-header"><span class="card-title">⚙ Settings & Part Master</span></div><div class="card-body"><p>Previous part numbers remain available as references. Returning parts can be scanned again. A new or corrected description can be entered without changing older inspections.</p><p><b>Known parts:</b> <span id="partsCount"></span></p><p class="field-hint">Work-order numbers in the historical HTML list may be outdated. Always verify the current work order before adding an inspection.</p><button class="btn btn-secondary" onclick="exportToExcel()">Backup All Reports</button><p class="field-hint">Secure multi-device history requires Supabase later; this build is for local testing only.</p></div></div></section>
 </main>
 
 <div id="scannerModal" class="scanner-modal" role="dialog" aria-modal="true" aria-labelledby="scannerTitle">
@@ -628,6 +749,24 @@
     if(dur!==0) toastTimer=setTimeout(function(){t.classList.remove('show');},dur||4000);
   }
 
+  var defectChoice='No';
+  function setDefectChoice(value){
+    defectChoice=value;
+    document.getElementById('def-no').classList.toggle('sel',value==='No');
+    document.getElementById('def-yes').classList.toggle('sel',value==='Yes');
+    document.getElementById('defectBox').classList.toggle('open',value==='Yes');
+  }
+  function showTab(tab){
+    document.querySelectorAll('.tab-page').forEach(function(e){e.classList.toggle('active',e.id==='page-'+tab)});
+    document.querySelectorAll('.navbtn').forEach(function(e){e.classList.toggle('active',e.dataset.tab===tab)});
+    if(tab==='history')renderHistory();
+    if(tab==='reports')renderReports();
+    if(tab==='settings')document.getElementById('partsCount').textContent=Object.keys(PARTS_DB).length+' starting references';
+    window.scrollTo(0,0);
+  }
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(x){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]})}
+  function storedParts(){try{return JSON.parse(localStorage.getItem('qcPartMaster')||'{}')}catch(e){return {}}}
+  function rememberPart(num,name){if(!num||!name)return;var p=storedParts();p[num.toUpperCase()]=name;try{localStorage.setItem('qcPartMaster',JSON.stringify(p))}catch(e){}}
   // ── LOOKUP FUNCTIONS ──────────────────────────────────────────────
   function lookupByJob(jobNum) {
     if(!jobNum||!jobNum.trim()) return;
@@ -636,13 +775,13 @@
     if(entry) {
       document.getElementById('partNum').value = entry.partNum;
       document.getElementById('partName').value = entry.partName;
-      showToast('success','Found: '+entry.partName.substring(0,45)+'...');
+      showToast('info','Historical lookup found. Verify this work order and part are CURRENT before saving.');
     }
   }
 
   function lookupPartName(partNum) {
     if(!partNum||!partNum.trim()) return;
-    var name = PARTS_DB[partNum.trim().toUpperCase()] || PARTS_DB[partNum.trim()] || '';
+    var name = storedParts()[partNum.trim().toUpperCase()] || PARTS_DB[partNum.trim().toUpperCase()] || PARTS_DB[partNum.trim()] || '';
     if(name) document.getElementById('partName').value = name;
   }
 
@@ -1087,6 +1226,18 @@
     showToast('success','NCPF# '+ncpf.ncpfNumber+' — '+disposition+' recorded.');
   }
 
+  // ── OPTIONAL WEIGHT: STORE SPECIFICATION AND MEASUREMENT AS ENTERED ──
+  var weightMode='na';
+  function setWeightMode(mode){
+    weightMode=mode;
+    document.getElementById('weight-na').classList.toggle('sel',mode==='na');
+    document.getElementById('weight-yes').classList.toggle('sel',mode==='yes');
+    document.getElementById('weightEntry').style.display=mode==='yes'?'block':'none';
+    if(mode==='na'){
+      ['measuredWeight','weightSpecMin','weightSpecMax'].forEach(function(id){document.getElementById(id).value='';});
+    }
+  }
+
   // ── CLEAR FORM ────────────────────────────────────────────────────
   function clearForm(){
     ['jobNum','machineNum','partNum','partName','notes'].forEach(function(id){document.getElementById(id).value='';});
@@ -1095,6 +1246,12 @@
     document.getElementById('photoBtn').classList.remove('has-photo');
     document.getElementById('photoBtnText').textContent='Add Defect Photo';
     setStatus('Up');
+    setDefectChoice('No');
+    document.getElementById('sampleQty').value='5';
+    setWeightMode('na');
+    document.getElementById('weightUnit').value='lb';
+    document.getElementById('moldCavityCount').value='';
+    ['defectQty','cavity','traceCode','defectType','defectDesc'].forEach(function(id){document.getElementById(id).value='';});
     measurements=[];renderMeasurements();
   }
 
@@ -1107,11 +1264,38 @@
     if(!machineNum){showToast('error','Tool / Machine # is required.');return;}
     if(currentStatus==='Up'&&!jobNum){showToast('error','Work Order # required for running machines.');return;}
     if(ncActive&&!validateNCPF()) return;
+    var sampleQty=Number(document.getElementById('sampleQty').value);
+    var defectQty=defectChoice==='Yes'?Number(document.getElementById('defectQty').value):0;
+    var moldCountRaw=document.getElementById('moldCavityCount').value.trim();
+    var moldCavityCount=moldCountRaw!==''?Number(moldCountRaw):null;
+    var weightRaw=document.getElementById('measuredWeight').value.trim();
+    var weightUnit=weightMode==='yes'?document.getElementById('weightUnit').value:null;
+    var weightValue=weightMode==='yes'?Number(weightRaw):null;
+    var weightSpecMinRaw=document.getElementById('weightSpecMin').value.trim();
+    var weightSpecMaxRaw=document.getElementById('weightSpecMax').value.trim();
+    var weightSpecMin=weightMode==='yes'&&weightSpecMinRaw!==''?Number(weightSpecMinRaw):null;
+    var weightSpecMax=weightMode==='yes'&&weightSpecMaxRaw!==''?Number(weightSpecMaxRaw):null;
+    if(!Number.isInteger(sampleQty)||sampleQty<1){showToast('error','Enter a valid sample size.');return;}
+    if(moldCavityCount!==null&&(!Number.isInteger(moldCavityCount)||moldCavityCount<1)){showToast('error','Enter a valid total cavity count.');return;}
+    if(weightMode==='yes'&&(weightRaw===''||!Number.isFinite(weightValue)||weightValue<0)){showToast('error','Enter the actual weight or choose N/A.');return;}
+    if(weightMode==='yes'&&(weightSpecMin===null||weightSpecMax===null||!Number.isFinite(weightSpecMin)||!Number.isFinite(weightSpecMax)||weightSpecMin<0||weightSpecMax<0||weightSpecMin>weightSpecMax)){showToast('error','Enter valid minimum and maximum weight specifications.');return;}
+    if(defectChoice==='Yes'){
+      if(!Number.isInteger(defectQty)||defectQty<1||defectQty>sampleQty){showToast('error','Defective quantity must be 1 to sample size.');return;}
+      var cavityValue=document.getElementById('cavity').value.trim();
+      if(/^\d+$/.test(cavityValue)&&moldCavityCount!==null&&(Number(cavityValue)<1||Number(cavityValue)>moldCavityCount)){showToast('error','Cavity number exceeds the total cavities in this mold.');return;}
+      if(!cavityValue||!document.getElementById('traceCode').value.trim()||!document.getElementById('defectType').value||!document.getElementById('defectDesc').value.trim()){
+        showToast('error','Complete cavity, trace code, defect type and description.');return;
+      }
+    }
     var now=new Date();
     var entry={
       id:Math.random().toString(36).substr(2,9),
       time:now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false}),
       date:now.toLocaleDateString('en-US'),
+      isoDate:now.toISOString(),
+      auditor:auditor,department:document.getElementById('dept').value,shift:document.getElementById('shift').value,roundNum:document.getElementById('round').value,
+      sampleQty:sampleQty,weightMode:weightMode,weightValue:weightValue,weightUnit:weightUnit,weightSpecMin:weightSpecMin,weightSpecMax:weightSpecMax,defectQty:defectQty,cavity:defectChoice==='Yes'?document.getElementById('cavity').value.trim():'',moldCavityCount:moldCavityCount,traceCode:document.getElementById('traceCode').value.trim(),
+      defectType:document.getElementById('defectType').value,defectDesc:document.getElementById('defectDesc').value.trim(),
       jobNum:jobNum,machineNum:machineNum,
       partNum:document.getElementById('partNum').value.trim(),
       partName:document.getElementById('partName').value.trim(),
@@ -1137,7 +1321,13 @@
       document.getElementById('ncpfSection').classList.remove('visible');
       resetNCPF();
     }
+    rememberPart(entry.partNum,entry.partName);
     round.push(entry);
+    // Persist finished entries immediately, so History and Reports work before Excel sync.
+    var minimal=Object.assign({},entry);
+    delete minimal.photoBase64;
+    allInspections.push(minimal);
+    try{localStorage.setItem('allInspections',JSON.stringify(allInspections));}catch(e){showToast('error','Browser storage full. Export reports now.');}
     try{localStorage.setItem('currentRound',JSON.stringify(round));}catch(e){}
     renderRound();
     clearForm();
@@ -1173,7 +1363,7 @@
     }).join('');
   }
 
-  function removeEntry(id){round=round.filter(function(e){return e.id!==id;});renderRound();}
+  function removeEntry(id){round=round.filter(function(e){return e.id!==id;});localStorage.setItem('currentRound',JSON.stringify(round));renderRound();}
   function clearRound(){if(!confirm('Clear all inspections?')) return;round=[];localStorage.removeItem('currentRound');renderRound();}
 
   // ── EMAIL REPORT ──────────────────────────────────────────────────
@@ -1221,22 +1411,14 @@
           WorkOrder:entry.jobNum,PartNumber:entry.partNum,PartName:entry.partName,ToolNumber:entry.machineNum,
           Status:entry.status,Notes:entry.notes,Measurements:entry.measSummary||'',
           NonConforming:entry.isNC?'Yes':'No',NCPFNumber:entry.ncpfNumber||'',
+          SampleQty:entry.sampleQty,DefectiveQty:entry.defectQty,TraceCode:entry.traceCode,Cavity:entry.cavity,TotalMoldCavities:entry.moldCavityCount??"",WeightStatus:entry.weightMode==='yes'?'Recorded':'N/A',Weight:entry.weightValue??'',WeightUnit:entry.weightUnit||'',WeightSpecMin:entry.weightSpecMin??'',WeightSpecMax:entry.weightSpecMax??'',DefectType:entry.defectType,DefectDescription:entry.defectDesc,
           HasPhoto:entry.hasPhoto,PhotoBase64:entry.photoBase64,PhotoName:entry.photoName
         })
-      }).then(function(){success++;}).catch(function(){failed++;});
+      }).then(function(response){if(!response.ok)throw new Error('Sync rejected: '+response.status);success++;}).catch(function(){failed++;});
     });
     Promise.all(promises).then(function(){
       btn.innerHTML='🚀 SYNC TO EXCEL';btn.disabled=false;
       if(failed===0){
-        var saved=allInspections.concat(round.map(function(e){
-          return {Date:e.date,Time:e.time,Auditor:document.getElementById('auditor').value,
-            Department:document.getElementById('dept').value,Shift:document.getElementById('shift').value,
-            Round:document.getElementById('round').value,WorkOrder:e.jobNum,PartNumber:e.partNum,
-            PartName:e.partName,ToolMachine:e.machineNum,Status:e.status,Measurements:e.measSummary||'',
-            NonConforming:e.isNC?'Yes':'No',NCPFNumber:e.ncpfNumber||'',HasPhoto:e.hasPhoto,Notes:e.notes};
-        }));
-        allInspections=saved;
-        try{localStorage.setItem('allInspections',JSON.stringify(saved));}catch(e){}
         showToast('success','All '+success+' entries synced to Excel!');
         round=[];localStorage.removeItem('currentRound');renderRound();
       } else {
@@ -1257,10 +1439,17 @@
         Status:e.status,Measurements:e.measSummary||'',NonConforming:e.isNC?'Yes':'No',
         NCPFNumber:e.ncpfNumber||'',HasPhoto:e.hasPhoto,Notes:e.notes};
     });
-    var exportData=allInspections.concat(currentData);
+    var exportData=allInspections.map(function(e){return Object.assign({
+      Date:e.date,Time:e.time,Auditor:e.auditor,Department:e.department,Shift:e.shift,Round:e.roundNum,
+      WorkOrder:e.jobNum,PartNumber:e.partNum,PartName:e.partName,ToolMachine:e.machineNum,
+      Status:e.status,Measurements:e.measSummary,NonConforming:e.isNC?'Yes':'No',NCPFNumber:e.ncpfNumber,
+      HasPhoto:e.hasPhoto,Notes:e.notes,SampleQty:e.sampleQty,DefectiveQty:e.defectQty,
+      TraceCode:e.traceCode,Cavity:e.cavity,TotalMoldCavities:e.moldCavityCount??"",WeightStatus:e.weightMode==='yes'?'Recorded':'N/A',Weight:e.weightValue??'',WeightUnit:e.weightUnit||'',WeightSpecMin:e.weightSpecMin??'',WeightSpecMax:e.weightSpecMax??'',DefectType:e.defectType,DefectDescription:e.defectDesc
+    },('WorkOrder' in e)?e:{});});
+    // Legacy saved rows are retained, but no double-counting current round records.
     if(exportData.length===0&&openNCPFs.length===0){showToast('error','No data to export yet.');return;}
-    var roundHeaders=['Date','Time','Auditor','Department','Shift','Round','WorkOrder','PartNumber','PartName','ToolMachine','Status','Measurements','NonConforming','NCPFNumber','HasPhoto','Notes'];
-    var roundRows=[roundHeaders].concat(exportData.map(function(r){return roundHeaders.map(function(h){return r[h]||''});}));
+    var roundHeaders=['Date','Time','Auditor','Department','Shift','Round','WorkOrder','PartNumber','PartName','ToolMachine','Status','Measurements','NonConforming','NCPFNumber','HasPhoto','Notes','SampleQty','DefectiveQty','TraceCode','Cavity','TotalMoldCavities','WeightStatus','Weight','WeightUnit','WeightSpecMin','WeightSpecMax','DefectType','DefectDescription'];
+    var roundRows=[roundHeaders].concat(exportData.map(function(r){return roundHeaders.map(function(h){return r[h]??''});}));
     var ncpfHeaders=['NCPF#','Date Found','Time','Generated By','Department','Area Responsible','Shift','Work Order','Part #','Part Name','Problem','Trace Code','Summary','Material Type','Qty Affected','Supervisor','Status','Disposition','Approved By','Is Manager','Justification','Date Closed'];
     var ncpfRows=[ncpfHeaders].concat(openNCPFs.map(function(n){
       return [n.ncpfNumber||'',n.date||'',n.time||'',n.generatedBy||'',n.department||'',n.areaResponsible||'',
@@ -1280,12 +1469,75 @@
     showToast('success','Excel file downloaded with 2 tabs!');
   }
 
+
+  // ── HISTORY / REPORTS ─────────────────────────────────────────────
+  var activeCharts={};
+  function inspectionRows(){
+    return allInspections.map(function(e){
+      return {id:e.id||'',date:e.isoDate?e.isoDate.slice(0,10):normalizeDate(e.date||e.Date),
+        time:e.time||e.Time||'',department:e.department||e.Department||'',shift:e.shift||e.Shift||'',
+        auditor:e.auditor||e.Auditor||'',jobNum:e.jobNum||e.WorkOrder||'',
+        partNum:e.partNum||e.PartNumber||'',partName:e.partName||e.PartName||'',
+        machine:e.machineNum||e.ToolMachine||'',sample:Number(e.sampleQty??e.SampleQty)||0,
+        defects:Number(e.defectQty??e.DefectiveQty)||0,trace:e.traceCode||e.TraceCode||'',
+        cavity:e.cavity||e.Cavity||'',totalMoldCavities:e.moldCavityCount||e.TotalMoldCavities||'',weightStatus:e.weightMode==='yes'?'Recorded':(e.weightMode==='na'?'N/A':''),weightValue:e.weightValue??e.Weight??'',weightUnit:e.weightUnit||e.WeightUnit||'',weightSpecMin:e.weightSpecMin??e.WeightSpecMin??'',weightSpecMax:e.weightSpecMax??e.WeightSpecMax??'',type:e.defectType||e.DefectType||'',
+        description:e.defectDesc||e.DefectDescription||'',status:e.status||e.Status||'',
+        nc:!!e.isNC||e.NonConforming==='Yes'};
+    });
+  }
+  function normalizeDate(s){if(!s)return '';var d=new Date(s);if(isNaN(d))return '';return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+  function tableHTML(rows){
+    var cols=['Date','Time','Part Number','Machine','Sample','Defective','Trace Code','Cavity','Mold Cavities','Weight','Defect Type','Result'];
+    if(!rows.length)return '<p style="padding:15px;color:#64748b">No inspections found.</p>';
+    return '<table class="report-table"><thead><tr>'+cols.map(function(h){return '<th>'+h+'</th>'}).join('')+'</tr></thead><tbody>'+rows.map(function(e){return '<tr><td>'+esc(e.date)+'</td><td>'+esc(e.time)+'</td><td>'+esc(e.partNum)+'</td><td>'+esc(e.machine)+'</td><td>'+e.sample+'</td><td>'+e.defects+'</td><td>'+esc(e.trace)+'</td><td>'+esc(e.cavity)+'</td><td>'+esc(e.totalMoldCavities)+'</td><td>'+esc(e.weightStatus==='Recorded'?([e.weightSpecMin,e.weightSpecMax].map(function(v){return v===null||v===''?'—':v}).join('–')+' / '+e.weightValue+' '+e.weightUnit):'N/A')+'</td><td>'+esc(e.type)+'</td><td><span class="pill '+(e.defects>0?'bad':'')+'">'+(e.defects>0?'Defect':'Pass')+'</span></td></tr>'}).join('')+'</tbody></table>';
+  }
+  function renderHistory(){
+    var q=(document.getElementById('historySearch').value||'').toLowerCase();var status=document.getElementById('historyResult').value;
+    var rows=inspectionRows().filter(function(e){return (!q||[e.partNum,e.machine,e.trace,e.cavity,e.jobNum].join(' ').toLowerCase().includes(q))&&(!status||(status==='Defect'?e.defects>0:e.defects===0))});
+    document.getElementById('historyTable').innerHTML=tableHTML(rows.slice().reverse());
+  }
+  function filteredRows(){
+    var d=document.getElementById('filterDept').value,sh=document.getElementById('filterShift').value,
+      from=document.getElementById('filterFrom').value,to=document.getElementById('filterTo').value,
+      q=document.getElementById('filterKeyword').value.toLowerCase();
+    return inspectionRows().filter(function(e){return (!d||e.department===d)&&(!sh||e.shift===sh)&&(!from||e.date>=from)&&(!to||e.date<=to)&&(!q||[e.partNum,e.machine].join(' ').toLowerCase().includes(q))});
+  }
+  function resetReportFilters(){['filterDept','filterShift','filterFrom','filterTo','filterKeyword'].forEach(function(id){document.getElementById(id).value=''});renderReports()}
+  function tally(rows,key){var result={};rows.forEach(function(e){var k=e[key]||'Unknown';result[k]=(result[k]||0)+e.defects});return Object.entries(result).filter(function(e){return e[1]>0}).sort(function(a,b){return b[1]-a[1]}).slice(0,8)}
+  function chart(id,type,labels,datasets,opts){
+    if(activeCharts[id]){activeCharts[id].destroy();delete activeCharts[id]}
+    if(typeof Chart==='undefined'){document.getElementById(id).parentElement.textContent='Charts require internet access to load Chart.js.';return;}
+    activeCharts[id]=new Chart(document.getElementById(id),{type:type,data:{labels:labels,datasets:datasets},options:Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type==='line'||type==='doughnut'}}},opts||{})});
+  }
+  function renderReports(){
+    var rows=filteredRows(),parts=rows.reduce(function(s,e){return s+e.sample},0),defects=rows.reduce(function(s,e){return s+e.defects},0);
+    document.getElementById('mInspections').textContent=rows.length.toLocaleString();
+    document.getElementById('mParts').textContent=parts.toLocaleString();
+    document.getElementById('mDefects').textContent=defects.toLocaleString();
+    document.getElementById('mRate').textContent=parts?(100*defects/parts).toFixed(2)+'%':'0.00%';
+    var days={};rows.forEach(function(e){if(!e.date)return;if(!days[e.date])days[e.date]={parts:0,defects:0};days[e.date].parts+=e.sample;days[e.date].defects+=e.defects});
+    var dates=Object.keys(days).sort();
+    chart('trendChart','line',dates,[{label:'Parts inspected',data:dates.map(function(x){return days[x].parts}),borderColor:'#2563eb',backgroundColor:'#2563eb',tension:.3},{label:'Defective parts',data:dates.map(function(x){return days[x].defects}),borderColor:'#ef4444',backgroundColor:'#ef4444',tension:.3}]);
+    var ty=tally(rows,'type'),ma=tally(rows,'machine'),ca=tally(rows.map(function(e){return Object.assign({},e,{cavity:e.cavity?e.partNum+' / '+e.machine+' / Cavity '+e.cavity:'Unknown cavity'});}), 'cavity');
+    var colors=['#ef4444','#f59e0b','#3b82f6','#8b5cf6','#22c55e','#94a3b8','#0ea5e9','#f97316'];
+    chart('typeChart','doughnut',ty.map(function(x){return x[0]}),[{data:ty.map(function(x){return x[1]}),backgroundColor:colors}]);
+    [['machineChart',ma],['cavityChart',ca]].forEach(function(g){chart(g[0],'bar',g[1].map(function(x){return x[0]}),[{data:g[1].map(function(x){return x[1]}),backgroundColor:colors}],{indexAxis:'y',plugins:{legend:{display:false}}})});
+    document.getElementById('findingsTable').innerHTML=tableHTML(rows.filter(function(e){return e.defects>0||e.nc}).slice(-10).reverse());
+  }
+  function exportFilteredCSV(){
+    var rows=filteredRows(),keys=['date','time','auditor','department','shift','jobNum','partNum','partName','machine','sample','defects','trace','cavity','totalMoldCavities','weightStatus','weightValue','weightUnit','weightSpecMin','weightSpecMax','type','description'];
+    var csv=[keys.join(',')].concat(rows.map(function(e){return keys.map(function(k){return '"'+String(e[k]??'').replace(/"/g,'""')+'"'}).join(',')})).join('\r\n');
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='QC-Audit-Filtered-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url)},500);
+  }
+
   // ── INIT ──────────────────────────────────────────────────────────
   if(round.length>0){
     renderRound();
     showToast('info','Restored '+round.length+' inspection(s) from last session.');
   }
   renderOpenNCPFs();
+  renderHistory();
 </script>
 </body>
 </html>
