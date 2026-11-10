@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
-  <title>QC Auditor Pro</title>
+  <title>QC Auditor Pro — Weight Report Update</title>
+  <!-- QC Weight Data Update 2026-11-10: Email + Excel + Per-Cavity -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -178,7 +179,10 @@
 .cal-actions{display:flex;flex-wrap:wrap;gap:8px}.cal-actions .btn{width:auto;min-width:145px;flex:1}
 .cal-search{display:grid;grid-template-columns:2fr 1fr 1fr;gap:9px}
 .cal-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.cal-metric{border:1px solid var(--border);background:white;padding:13px;border-radius:11px}
+.cal-metric{border:1px solid var(--border);background:white;padding:13px;border-radius:11px;text-align:left;width:100%;font-family:inherit;color:var(--text);cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
+.cal-metric:hover,.cal-metric:focus-visible{border-color:var(--green);box-shadow:0 0 0 3px rgba(118,176,65,.16);outline:none}
+.cal-metric[aria-pressed="true"]{border:2px solid var(--green-dark);background:var(--green-light);padding:12px}
+.cal-metric small{display:block}.cal-metric .cal-tap{font-size:10px;color:var(--green-dark);display:block;margin-top:5px}
 .cal-metric b{display:block;font-size:25px}.cal-metric small{color:var(--muted);font-weight:700}
 .cal-tool{border:1px solid var(--border);border-radius:12px;background:white;margin:10px 0;padding:12px}
 .cal-tool summary{cursor:pointer;display:flex;gap:10px;align-items:center;justify-content:space-between;list-style:none}
@@ -201,6 +205,8 @@
 .work-callout{padding:12px;border:1px solid #fcd34d;background:#fffbeb;border-radius:12px;color:#92400e;font-size:12px;line-height:1.5}.work-empty{font-size:12px;color:var(--muted);padding:16px;text-align:center}.work-section-head{font-weight:900;font-size:13px;color:#1e293b;margin:12px 0 8px}
 @media(max-width:650px){.work-metrics{grid-template-columns:repeat(2,1fr)}.work-controls,.work-editor{grid-template-columns:1fr}.work-editor .wide{grid-column:auto}}
 
+  @media(max-width:850px){#weightTrendSection .filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+  @media(max-width:440px){#weightTrendSection .filter-grid{grid-template-columns:1fr!important}}
   </style>
 </head>
 <body>
@@ -358,7 +364,24 @@
             <div class="field"><label for="measuredWeight">Actual measured weight</label><input id="measuredWeight" type="number" min="0" step="any" placeholder="e.g. 0.250"></div>
             <div class="field"><label for="weightUnit">Weight unit (spec and actual)</label><select id="weightUnit"><option value="lb">Pounds (lb)</option><option value="g">Grams (g)</option></select></div>
           </div>
-          <div class="field-hint">Use the same selected unit for the specification and actual measurement. No automatic conversion or pass/fail.</div>
+          <div class="field" style="margin-top:10px">
+            <label for="weightMethod">Weight recording method</label>
+            <select id="weightMethod" onchange="updateWeightMethod()">
+              <option value="single">Single measured weight</option>
+              <option value="cavities">Cavity ID + Weight (one at a time)</option>
+            </select>
+          </div>
+          <div id="cavityWeightPanel" style="display:none;margin-top:10px">
+            <div class="field-hint">Enter one cavity at a time. The cavity ID can be 1, A1, B4, etc. Press Add Weight to record it and continue. The mold cavity count is used for progress, not to force a particular numbering scheme.</div>
+            <div class="field-row" style="margin-top:10px">
+              <div class="field"><label for="nextCavityID">Cavity ID</label><input id="nextCavityID" type="text" maxlength="32" autocomplete="off" placeholder="e.g. A1, B4 or 12" onkeydown="if(event.key==='Enter'){event.preventDefault();addCavityWeight();}"></div>
+              <div class="field"><label for="nextCavityWeight">Measured Weight</label><input id="nextCavityWeight" type="number" step="any" min="0" inputmode="decimal" placeholder="e.g. 0.005" onkeydown="if(event.key==='Enter'){event.preventDefault();addCavityWeight();}"></div>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="addCavityWeight()" style="margin-top:9px">＋ Add Weight / Next Cavity</button>
+            <div id="cavityWeightProgress" class="field-hint" role="status" style="margin-top:8px">0 readings recorded.</div>
+            <div id="cavityWeightInputs" style="margin-top:8px"></div>
+          </div>
+          <div class="field-hint">Use the same selected unit for the specification and actual measurement. The app records the values as entered; it does not automatically approve parts.</div>
         </div>
       </div>
       <div class="section-label" style="color:#dc2626">5. Did you find any defects? <span class="req">*</span></div>
@@ -499,6 +522,22 @@
  <div class="field"><label>Machine / Part</label><input id="filterKeyword" placeholder="All" onkeydown="if(event.key==='Enter')renderReports()"></div>
  </div><div style="display:flex;justify-content:flex-end;gap:10px"><button class="btn btn-secondary" style="width:auto" onclick="resetReportFilters()">Reset</button><button class="btn btn-primary" style="width:auto" onclick="renderReports()">Apply</button></div></div></div>
  <div class="metric-grid"><div class="metric"><div class="metric-label">Total Inspections</div><div class="metric-value" id="mInspections">0</div></div><div class="metric"><div class="metric-label">Parts Inspected</div><div class="metric-value" id="mParts">0</div></div><div class="metric"><div class="metric-label">Defective Parts</div><div class="metric-value" id="mDefects">0</div></div><div class="metric"><div class="metric-label">Sample Defect Rate</div><div class="metric-value" id="mRate">0.00%</div></div></div>
+ <div class="card" style="margin-bottom:14px" id="weightTrendSection">
+   <div class="card-header"><span class="card-title">⚖ Part Weight Trends — By Cavity</span></div>
+   <div class="card-body">
+     <p class="field-hint">Charts use actual saved inspection measurements. Select a part, machine, and weight unit. No extra data entry is required.</p>
+     <div class="filter-grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+       <div class="field"><label for="weightTrendPart">Part Number</label><select id="weightTrendPart" onchange="weightTrendChoicesChanged()"><option value="">Select part...</option></select></div>
+       <div class="field"><label for="weightTrendMachine">Machine</label><select id="weightTrendMachine" onchange="weightTrendChoicesChanged()"><option value="">Select machine...</option></select></div>
+       <div class="field"><label for="weightTrendUnit">Unit</label><select id="weightTrendUnit" onchange="renderWeightTrend()"><option value="">Select unit...</option></select></div>
+       <div class="field"><label for="weightTrendCavity">Cavity</label><select id="weightTrendCavity" onchange="renderWeightTrend()"><option value="all">All cavities</option></select></div>
+     </div>
+     <div id="weightTrendMessage" role="status" class="field-hint"></div>
+     <div class="chart-holder" style="height:310px"><canvas id="weightTrendChart"></canvas></div>
+     <div class="work-actions"><button class="btn btn-secondary" onclick="exportWeightTrendCSV()">⬇ Export Weight Data CSV</button><button class="btn btn-secondary" onclick="renderWeightTrend()">↻ Refresh Chart</button></div>
+     <p class="field-hint">Only recorded per-cavity weights are plotted by cavity. A single measured weight cannot be attributed to a cavity. Specification limits are shown only when recorded with the inspection. Reference your approved Spec Sheet before decisions.</p>
+   </div>
+ </div>
  <div class="card" style="margin-bottom:14px"><div class="card-body"><div class="report-title">Defect Trend Over Time</div><div class="chart-holder"><canvas id="trendChart"></canvas></div></div></div>
  <div class="report-grid" style="margin-bottom:14px"><div class="card"><div class="card-body"><div class="report-title">Defects by Type</div><div class="chart-holder"><canvas id="typeChart"></canvas></div></div></div><div class="card"><div class="card-body"><div class="report-title">Defects by Machine</div><div class="chart-holder"><canvas id="machineChart"></canvas></div></div></div><div class="card"><div class="card-body"><div class="report-title">Top Cavity Issues</div><div class="chart-holder"><canvas id="cavityChart"></canvas></div></div></div></div>
  <div class="card"><div class="card-header"><span class="card-title" style="color:#dc2626">⚠ Recent Non-Conforming Findings</span></div><div class="card-body"><div class="report-table-wrap" id="findingsTable"></div><button class="btn btn-secondary" onclick="showTab('export')">Export Filtered Results</button></div></div>
@@ -511,6 +550,12 @@
   <h2 style="margin-bottom:8px">☀ My Day — Quality Priorities</h2>
   <div class="trial-notice">This is an in-app reminder board. It updates when QC Audit Pro is opened; it does not send notifications while the site is closed.</div>
   <div class="work-metrics"><div class="work-metric"><b id="dayOpen">0</b><small>Open projects</small></div><div class="work-metric"><b id="dayOverdue">0</b><small>Overdue projects</small></div><div class="work-metric"><b id="dayFollowups">0</b><small>Follow-ups due</small></div><div class="work-metric"><b id="dayCalibration">0</b><small>Calibration actions</small></div></div>
+  <div class="card" style="margin-bottom:14px"><div class="card-header"><span class="card-title">📘 ISO / QMS Action Guide</span></div><div class="card-body">
+    <p class="field-hint">Reference only. Confirm applicability, current ISO edition, approved company SOP, owner and due date with Quality management. This tool does not establish ISO compliance or replace IMSXpress.</p>
+    <div class="field"><label>Approved QMS edition used at your site</label><select id="qmsEdition" onchange="qmsSaveEdition()"><option value="Unconfirmed">Not confirmed</option><option value="ISO 9001:2015">ISO 9001:2015 (transition)</option><option value="ISO 9001:2026">ISO 9001:2026</option></select></div>
+    <p class="field-hint">ISO 9001:2026 was published September 16, 2026. Clause references below are from 2015 and must be reviewed against the approved 2026 edition as appropriate.</p>
+    <div id="qmsGuide"></div>
+  </div></div>
   <div class="card"><div class="card-header"><span class="card-title">🎯 What should I work on next?</span></div><div class="card-body"><div id="dayMessages"></div><div class="work-actions"><button class="btn btn-primary" onclick="showTab('projects')">Open My Projects</button><button class="btn btn-secondary" onclick="showTab('calibration')">Open Calibration Manager</button></div></div></div>
 </section>
 <section id="page-projects" class="tab-page">
@@ -550,10 +595,10 @@
   <div class="card" style="margin-bottom:14px"><div class="card-header"><span class="card-title">🛠 Calibration Manager</span></div><div class="card-body">
     <div class="cal-banner" id="calReminder">Import equipment to see calibration reminders.</div>
     <div class="cal-grid">
-      <div class="cal-metric"><b id="calTotal">0</b><small>Total equipment</small></div>
-      <div class="cal-metric"><b id="calDue">0</b><small>Due within 60 days</small></div>
-      <div class="cal-metric"><b id="calOverdue">0</b><small>Overdue (Active)</small></div>
-      <div class="cal-metric"><b id="calMissing">0</b><small>Unable to locate</small></div>
+      <button type="button" class="cal-metric" data-cal-filter="all" aria-pressed="false" onclick="calQuickFilter('all')"><b id="calTotal">0</b><small>Total equipment</small><span class="cal-tap">View tools →</span></button>
+      <button type="button" class="cal-metric" data-cal-filter="due" aria-pressed="false" onclick="calQuickFilter('due')"><b id="calDue">0</b><small>Due within 60 days</small><span class="cal-tap">View tools →</span></button>
+      <button type="button" class="cal-metric" data-cal-filter="overdue" aria-pressed="false" onclick="calQuickFilter('overdue')"><b id="calOverdue">0</b><small>Overdue (Active)</small><span class="cal-tap">View tools →</span></button>
+      <button type="button" class="cal-metric" data-cal-filter="missing" aria-pressed="false" onclick="calQuickFilter('missing')"><b id="calMissing">0</b><small>Unable to locate</small><span class="cal-tap">View tools →</span></button>
     </div>
     <div class="cal-actions"><button class="btn btn-primary" onclick="document.getElementById('calImportFile').click()">📥 Import IMSXpress Excel</button><button class="btn btn-secondary" onclick="calExportVisit()">📋 Calibration Visit List</button><button class="btn btn-secondary" onclick="calBackup()">⬇ Backup Tracker</button></div>
     <input hidden type="file" id="calImportFile" accept=".xlsx,.xls,.csv" onchange="calImportFile(this)">
@@ -561,11 +606,11 @@
     <div class="section-label">Equipment Search & Filters</div>
     <div class="cal-search">
       <input id="calSearch" placeholder="Tool ID, description, serial, department" oninput="calRender()">
-      <select id="calView" onchange="calRender()"><option value="due">Due / Overdue (60 days)</option><option value="all">All equipment</option><option value="missing">Unable to locate</option><option value="located">Located</option><option value="duplicate">Duplicate serial numbers</option><option value="out">Out for calibration</option></select>
+      <select id="calView" onchange="calRender()"><option value="due">Due within 60 days</option><option value="overdue">Overdue (Active)</option><option value="all">All equipment</option><option value="missing">Unable to locate</option><option value="located">Located</option><option value="duplicate">Duplicate serial numbers</option><option value="out">Out for calibration</option></select>
       <select id="calDepartment" onchange="calRender()"><option value="">All departments</option></select>
     </div>
     <p class="field-hint">Click a tool to see serial number, department, calibration status, due date and other details. <strong>Notes remain visible.</strong> Your location tracking is separate from official calibration status.</p>
-    <div id="calCount" style="font-size:12px;color:var(--muted);font-weight:700"></div>
+    <div id="calCount" role="status" aria-live="polite" style="font-size:12px;color:var(--muted);font-weight:700"></div>
     <div id="calTools"></div>
     <div class="cal-actions"><button class="btn btn-secondary" onclick="calExportAll()">Export All Equipment CSV</button><button class="btn btn-secondary" onclick="document.getElementById('calCertFiles').click()">Identify Certificate Filenames</button></div>
     <input hidden type="file" id="calCertFiles" multiple accept=".pdf" onchange="calCertificates(this)">
@@ -1329,6 +1374,10 @@
 
   // ── OPTIONAL WEIGHT: STORE SPECIFICATION AND MEASUREMENT AS ENTERED ──
   var weightMode='na';
+  // Each reading is tied to the real mold mark, including alphanumeric cavity IDs.
+  var pendingCavityWeights=[];
+  var editingCavityID=null;
+  function cavityID(value){return String(value??'').trim().toUpperCase();}
   function setWeightMode(mode){
     weightMode=mode;
     document.getElementById('weight-na').classList.toggle('sel',mode==='na');
@@ -1336,7 +1385,73 @@
     document.getElementById('weightEntry').style.display=mode==='yes'?'block':'none';
     if(mode==='na'){
       ['measuredWeight','weightSpecMin','weightSpecMax'].forEach(function(id){document.getElementById(id).value='';});
+      document.getElementById('weightMethod').value='single';
+      pendingCavityWeights=[];editingCavityID=null;
+      document.getElementById('nextCavityID').value='';
+      document.getElementById('nextCavityWeight').value='';
+      renderPendingCavityWeights();
     }
+    updateWeightMethod();
+  }
+  function updateWeightMethod(){
+    var perCavity=weightMode==='yes'&&document.getElementById('weightMethod').value==='cavities';
+    document.getElementById('measuredWeight').closest('.field').style.display=perCavity?'none':'';
+    document.getElementById('cavityWeightPanel').style.display=perCavity?'block':'none';
+    if(perCavity)renderPendingCavityWeights();
+  }
+  function updateCavityWeightFields(){renderPendingCavityWeights();}
+  function addCavityWeight(){
+    var id=cavityID(document.getElementById('nextCavityID').value);
+    var raw=document.getElementById('nextCavityWeight').value.trim();
+    var value=Number(raw);
+    if(!id){showToast('error','Enter the cavity ID (for example A1, B4 or 12).');return;}
+    if(raw===''||!Number.isFinite(value)||value<0){showToast('error','Enter a valid measured weight.');return;}
+    var match=pendingCavityWeights.findIndex(function(r){return cavityID(r.cavity)===id;});
+    if(match!==-1 && editingCavityID!==id){showToast('error','Cavity '+id+' is already recorded. Use Edit to correct its weight.');return;}
+    if(editingCavityID && editingCavityID!==id){
+      pendingCavityWeights=pendingCavityWeights.filter(function(r){return cavityID(r.cavity)!==editingCavityID;});
+    }
+    var existing=pendingCavityWeights.findIndex(function(r){return cavityID(r.cavity)===id;});
+    if(existing===-1)pendingCavityWeights.push({cavity:id,weight:value});
+    else pendingCavityWeights[existing]={cavity:id,weight:value};
+    editingCavityID=null;
+    document.getElementById('nextCavityID').value='';
+    document.getElementById('nextCavityWeight').value='';
+    renderPendingCavityWeights();
+    document.getElementById('nextCavityID').focus();
+  }
+  function editCavityWeight(index){
+    var r=pendingCavityWeights[index];if(!r)return;
+    editingCavityID=cavityID(r.cavity);
+    document.getElementById('nextCavityID').value=r.cavity;
+    document.getElementById('nextCavityWeight').value=r.weight;
+    document.getElementById('nextCavityWeight').focus();
+  }
+  function removeCavityWeight(index){
+    pendingCavityWeights.splice(index,1);editingCavityID=null;renderPendingCavityWeights();
+  }
+  function renderPendingCavityWeights(){
+    var list=document.getElementById('cavityWeightInputs');if(!list)return;
+    list.replaceChildren();
+    var count=Number(document.getElementById('moldCavityCount').value);
+    var total=Number.isInteger(count)&&count>0?count:null;
+    document.getElementById('cavityWeightProgress').textContent=pendingCavityWeights.length+' of '+(total??'?')+' cavities recorded'+(total&&pendingCavityWeights.length>=total?' — count reached; review and save inspection.':'.');
+    pendingCavityWeights.forEach(function(r,i){
+      var row=document.createElement('div');row.className='round-item';
+      var desc=document.createElement('div');desc.className='round-tool';desc.textContent='Cavity '+r.cavity+' — '+r.weight+' '+document.getElementById('weightUnit').value;
+      var buttons=document.createElement('div');buttons.style.cssText='display:flex;gap:6px';
+      var edit=document.createElement('button');edit.type='button';edit.className='btn-danger-outline';edit.style.cssText='border-color:#94a3b8;color:#334155';edit.textContent='Edit';edit.onclick=function(){editCavityWeight(i)};
+      var del=document.createElement('button');del.type='button';del.className='btn-danger-outline';del.textContent='Remove';del.onclick=function(){removeCavityWeight(i)};
+      buttons.append(edit,del);row.append(desc,buttons);list.appendChild(row);
+    });
+  }
+  document.getElementById('moldCavityCount').addEventListener('input',updateCavityWeightFields);
+  document.getElementById('weightUnit').addEventListener('change',renderPendingCavityWeights);
+  function formatInspectionWeight(e){
+    if(e.weightMode!=='yes'&&e.WeightStatus!=='Recorded')return 'N/A';
+    var unit=e.weightUnit||e.WeightUnit||'';
+    var readings=Array.isArray(e.cavityWeights)?e.cavityWeights:[];
+    return readings.length?readings.map(function(r){return 'Cavity '+r.cavity+': '+r.weight+' '+unit;}).join('; '):((e.weightValue??e.Weight??'')+' '+unit).trim();
   }
 
   // ── CLEAR FORM ────────────────────────────────────────────────────
@@ -1378,7 +1493,19 @@
     var weightSpecMax=weightMode==='yes'&&weightSpecMaxRaw!==''?Number(weightSpecMaxRaw):null;
     if(!Number.isInteger(sampleQty)||sampleQty<1){showToast('error','Enter a valid sample size.');return;}
     if(moldCavityCount!==null&&(!Number.isInteger(moldCavityCount)||moldCavityCount<1)){showToast('error','Enter a valid total cavity count.');return;}
-    if(weightMode==='yes'&&(weightRaw===''||!Number.isFinite(weightValue)||weightValue<0)){showToast('error','Enter the actual weight or choose N/A.');return;}
+    var perCavity=weightMode==='yes'&&document.getElementById('weightMethod').value==='cavities';
+    var cavityWeights=[];
+    if(perCavity){
+      if(moldCavityCount===null||moldCavityCount>64){showToast('error','Set the mold cavity count (1–64) to record per-cavity weights.');return;}
+      if(!pendingCavityWeights.length){showToast('error','Add at least one cavity weight before saving.');return;}
+      if(pendingCavityWeights.length>moldCavityCount){showToast('error','Recorded cavity count exceeds the mold count. Review your entries.');return;}
+      if(document.getElementById('nextCavityID').value.trim()||document.getElementById('nextCavityWeight').value.trim()){
+        showToast('error','A cavity reading is still in the entry boxes. Click Add Weight before saving.');return;
+      }
+      cavityWeights=pendingCavityWeights.map(function(r){return {cavity:cavityID(r.cavity),weight:Number(r.weight)};});
+      weightValue=null;
+    }
+    if(weightMode==='yes'&&!perCavity&&(weightRaw===''||!Number.isFinite(weightValue)||weightValue<0)){showToast('error','Enter the actual weight or choose N/A.');return;}
     if(weightMode==='yes'&&(weightSpecMin===null||weightSpecMax===null||!Number.isFinite(weightSpecMin)||!Number.isFinite(weightSpecMax)||weightSpecMin<0||weightSpecMax<0||weightSpecMin>weightSpecMax)){showToast('error','Enter valid minimum and maximum weight specifications.');return;}
     if(defectChoice==='Yes'){
       if(!Number.isInteger(defectQty)||defectQty<1||defectQty>sampleQty){showToast('error','Defective quantity must be 1 to sample size.');return;}
@@ -1395,7 +1522,7 @@
       date:now.toLocaleDateString('en-US'),
       isoDate:now.toISOString(),
       auditor:auditor,department:document.getElementById('dept').value,shift:document.getElementById('shift').value,roundNum:document.getElementById('round').value,
-      sampleQty:sampleQty,weightMode:weightMode,weightValue:weightValue,weightUnit:weightUnit,weightSpecMin:weightSpecMin,weightSpecMax:weightSpecMax,defectQty:defectQty,cavity:defectChoice==='Yes'?document.getElementById('cavity').value.trim():'',moldCavityCount:moldCavityCount,traceCode:document.getElementById('traceCode').value.trim(),
+      sampleQty:sampleQty,weightMode:weightMode,weightMethod:perCavity?'cavities':'single',cavityWeights:cavityWeights,weightValue:weightValue,weightUnit:weightUnit,weightSpecMin:weightSpecMin,weightSpecMax:weightSpecMax,defectQty:defectQty,cavity:defectChoice==='Yes'?document.getElementById('cavity').value.trim():'',moldCavityCount:moldCavityCount,traceCode:document.getElementById('traceCode').value.trim(),
       defectType:document.getElementById('defectType').value,defectDesc:document.getElementById('defectDesc').value.trim(),
       jobNum:jobNum,machineNum:machineNum,
       partNum:document.getElementById('partNum').value.trim(),
@@ -1453,6 +1580,7 @@
             '<div class="round-job">JOB '+(e.jobNum||'N/A')+(e.isNC?' 🚨':'')+' | '+e.machineNum+'</div>'+
             '<div class="round-tool">'+(e.partNum||'')+(e.partName?' — '+e.partName.substring(0,30):'')+'</div>'+
             (e.measCount>0?'<div class="round-tool" style="color:var(--green)">📏 '+e.measCount+' measurements</div>':'')+
+            '<div class="round-tool">Sample: '+esc(e.sampleQty??'—')+' | Mold cavities: '+esc(e.moldCavityCount??'—')+' | Weight: '+esc(formatInspectionWeight(e))+'</div>'+
           '</div>'+
         '</div>'+
         '<div class="round-item-right">'+
@@ -1482,6 +1610,9 @@
     var lines=round.map(function(e,i){
       var line=(i+1)+'. '+e.time+' | JOB: '+(e.jobNum||'N/A')+' | Machine: '+e.machineNum+' | Status: '+e.status;
       if(e.partName) line+=' | '+e.partName;
+      line+='\n    Parts inspected: '+(e.sampleQty??'—')+' | Mold cavities: '+(e.moldCavityCount??'—');
+      line+='\n    Weight: '+formatInspectionWeight(e);
+      if(e.weightMode==='yes')line+='\n    Weight specification: '+e.weightSpecMin+' – '+e.weightSpecMax+' '+(e.weightUnit||'');
       if(e.isNC) line+=' | NC NCPF#'+e.ncpfNumber;
       if(e.notes) line+=' | Notes: '+e.notes;
       return line;
@@ -1512,7 +1643,7 @@
           WorkOrder:entry.jobNum,PartNumber:entry.partNum,PartName:entry.partName,ToolNumber:entry.machineNum,
           Status:entry.status,Notes:entry.notes,Measurements:entry.measSummary||'',
           NonConforming:entry.isNC?'Yes':'No',NCPFNumber:entry.ncpfNumber||'',
-          SampleQty:entry.sampleQty,DefectiveQty:entry.defectQty,TraceCode:entry.traceCode,Cavity:entry.cavity,TotalMoldCavities:entry.moldCavityCount??"",WeightStatus:entry.weightMode==='yes'?'Recorded':'N/A',Weight:entry.weightValue??'',WeightUnit:entry.weightUnit||'',WeightSpecMin:entry.weightSpecMin??'',WeightSpecMax:entry.weightSpecMax??'',DefectType:entry.defectType,DefectDescription:entry.defectDesc,
+          SampleQty:entry.sampleQty,DefectiveQty:entry.defectQty,TraceCode:entry.traceCode,Cavity:entry.cavity,TotalMoldCavities:entry.moldCavityCount??"",WeightMethod:entry.weightMethod||'single',CavityWeights:formatInspectionWeight(entry),WeightStatus:entry.weightMode==='yes'?'Recorded':'N/A',Weight:entry.weightValue??'',WeightUnit:entry.weightUnit||'',WeightSpecMin:entry.weightSpecMin??'',WeightSpecMax:entry.weightSpecMax??'',DefectType:entry.defectType,DefectDescription:entry.defectDesc,
           HasPhoto:entry.hasPhoto,PhotoBase64:entry.photoBase64,PhotoName:entry.photoName
         })
       }).then(function(response){if(!response.ok)throw new Error('Sync rejected: '+response.status);success++;}).catch(function(){failed++;});
@@ -1538,18 +1669,19 @@
       return {Date:e.date,Time:e.time,Auditor:auditor,Department:dept,Shift:shift,Round:roundNum,
         WorkOrder:e.jobNum,PartNumber:e.partNum,PartName:e.partName,ToolMachine:e.machineNum,
         Status:e.status,Measurements:e.measSummary||'',NonConforming:e.isNC?'Yes':'No',
-        NCPFNumber:e.ncpfNumber||'',HasPhoto:e.hasPhoto,Notes:e.notes};
+        NCPFNumber:e.ncpfNumber||'',HasPhoto:e.hasPhoto,Notes:e.notes,
+        SampleQty:e.sampleQty,TotalMoldCavities:e.moldCavityCount,WeightMethod:e.weightMethod||'single',CavityWeights:formatInspectionWeight(e),Weight:e.weightValue,WeightUnit:e.weightUnit,WeightSpecMin:e.weightSpecMin,WeightSpecMax:e.weightSpecMax};
     });
     var exportData=allInspections.map(function(e){return Object.assign({
       Date:e.date,Time:e.time,Auditor:e.auditor,Department:e.department,Shift:e.shift,Round:e.roundNum,
       WorkOrder:e.jobNum,PartNumber:e.partNum,PartName:e.partName,ToolMachine:e.machineNum,
       Status:e.status,Measurements:e.measSummary,NonConforming:e.isNC?'Yes':'No',NCPFNumber:e.ncpfNumber,
       HasPhoto:e.hasPhoto,Notes:e.notes,SampleQty:e.sampleQty,DefectiveQty:e.defectQty,
-      TraceCode:e.traceCode,Cavity:e.cavity,TotalMoldCavities:e.moldCavityCount??"",WeightStatus:e.weightMode==='yes'?'Recorded':'N/A',Weight:e.weightValue??'',WeightUnit:e.weightUnit||'',WeightSpecMin:e.weightSpecMin??'',WeightSpecMax:e.weightSpecMax??'',DefectType:e.defectType,DefectDescription:e.defectDesc
+      TraceCode:e.traceCode,Cavity:e.cavity,TotalMoldCavities:e.moldCavityCount??"",WeightMethod:e.weightMethod||'single',CavityWeights:Array.isArray(e.cavityWeights)&&e.cavityWeights.length?formatInspectionWeight(e):'',WeightStatus:e.weightMode==='yes'?'Recorded':'N/A',Weight:e.weightValue??'',WeightUnit:e.weightUnit||'',WeightSpecMin:e.weightSpecMin??'',WeightSpecMax:e.weightSpecMax??'',DefectType:e.defectType,DefectDescription:e.defectDesc
     },('WorkOrder' in e)?e:{});});
     // Legacy saved rows are retained, but no double-counting current round records.
     if(exportData.length===0&&openNCPFs.length===0){showToast('error','No data to export yet.');return;}
-    var roundHeaders=['Date','Time','Auditor','Department','Shift','Round','WorkOrder','PartNumber','PartName','ToolMachine','Status','Measurements','NonConforming','NCPFNumber','HasPhoto','Notes','SampleQty','DefectiveQty','TraceCode','Cavity','TotalMoldCavities','WeightStatus','Weight','WeightUnit','WeightSpecMin','WeightSpecMax','DefectType','DefectDescription'];
+    var roundHeaders=['Date','Time','Auditor','Department','Shift','Round','WorkOrder','PartNumber','PartName','ToolMachine','Status','Measurements','NonConforming','NCPFNumber','HasPhoto','Notes','SampleQty','DefectiveQty','TraceCode','Cavity','TotalMoldCavities','WeightMethod','CavityWeights','WeightStatus','Weight','WeightUnit','WeightSpecMin','WeightSpecMax','DefectType','DefectDescription'];
     var roundRows=[roundHeaders].concat(exportData.map(function(r){return roundHeaders.map(function(h){return r[h]??''});}));
     var ncpfHeaders=['NCPF#','Date Found','Time','Generated By','Department','Area Responsible','Shift','Work Order','Part #','Part Name','Problem','Trace Code','Summary','Material Type','Qty Affected','Supervisor','Status','Disposition','Approved By','Is Manager','Justification','Date Closed'];
     var ncpfRows=[ncpfHeaders].concat(openNCPFs.map(function(n){
@@ -1562,6 +1694,18 @@
     var ws1=XLSX.utils.aoa_to_sheet(roundRows);
     ws1['!cols']=roundHeaders.map(function(h){return{wch:h==='PartName'||h==='Notes'?30:12};});
     XLSX.utils.book_append_sheet(wb,ws1,'Audit Round Log');
+    // One row per weighed cavity makes the data easy to chart and analyze in Excel.
+    var cavityRows=[];
+    allInspections.forEach(function(e){
+      (Array.isArray(e.cavityWeights)?e.cavityWeights:[]).forEach(function(r){
+        cavityRows.push({Date:e.date,Time:e.time,Auditor:e.auditor,Department:e.department,Shift:e.shift,Round:e.roundNum,
+          WorkOrder:e.jobNum,PartNumber:e.partNum,Machine:e.machineNum,Cavity:r.cavity,ActualWeight:r.weight,
+          Unit:e.weightUnit,SpecMin:e.weightSpecMin,SpecMax:e.weightSpecMax,
+          WithinSpec:(e.weightSpecMin==null||e.weightSpecMax==null)?'Not evaluated':(r.weight>=e.weightSpecMin&&r.weight<=e.weightSpecMax?'Yes':'No'),InspectionID:e.id});
+      });
+    });
+    var cavityWS=XLSX.utils.json_to_sheet(cavityRows.length?cavityRows:[{Note:'No per-cavity weight readings recorded yet.'}]);
+    XLSX.utils.book_append_sheet(wb,cavityWS,'Cavity Weights');
     var ws2=XLSX.utils.aoa_to_sheet(ncpfRows);
     ws2['!cols']=ncpfHeaders.map(function(h){return{wch:h==='Problem'||h==='Justification'?35:15};});
     XLSX.utils.book_append_sheet(wb,ws2,'NCPF Log');
@@ -1581,7 +1725,7 @@
         partNum:e.partNum||e.PartNumber||'',partName:e.partName||e.PartName||'',
         machine:e.machineNum||e.ToolMachine||'',sample:Number(e.sampleQty??e.SampleQty)||0,
         defects:Number(e.defectQty??e.DefectiveQty)||0,trace:e.traceCode||e.TraceCode||'',
-        cavity:e.cavity||e.Cavity||'',totalMoldCavities:e.moldCavityCount||e.TotalMoldCavities||'',weightStatus:e.weightMode==='yes'?'Recorded':(e.weightMode==='na'?'N/A':''),weightValue:e.weightValue??e.Weight??'',weightUnit:e.weightUnit||e.WeightUnit||'',weightSpecMin:e.weightSpecMin??e.WeightSpecMin??'',weightSpecMax:e.weightSpecMax??e.WeightSpecMax??'',type:e.defectType||e.DefectType||'',
+        cavity:e.cavity||e.Cavity||'',totalMoldCavities:e.moldCavityCount||e.TotalMoldCavities||'',weightStatus:e.weightMode==='yes'?'Recorded':(e.weightMode==='na'?'N/A':''),weightValue:e.weightValue??e.Weight??'',weightUnit:e.weightUnit||e.WeightUnit||'',weightSpecMin:e.weightSpecMin??e.WeightSpecMin??'',weightSpecMax:e.weightSpecMax??e.WeightSpecMax??'',cavityWeights:Array.isArray(e.cavityWeights)?e.cavityWeights:[],weightMethod:e.weightMethod||e.WeightMethod||'single',type:e.defectType||e.DefectType||'',
         description:e.defectDesc||e.DefectDescription||'',status:e.status||e.Status||'',
         nc:!!e.isNC||e.NonConforming==='Yes'};
     });
@@ -1590,7 +1734,7 @@
   function tableHTML(rows){
     var cols=['Date','Time','Part Number','Machine','Sample','Defective','Trace Code','Cavity','Mold Cavities','Weight','Defect Type','Result'];
     if(!rows.length)return '<p style="padding:15px;color:#64748b">No inspections found.</p>';
-    return '<table class="report-table"><thead><tr>'+cols.map(function(h){return '<th>'+h+'</th>'}).join('')+'</tr></thead><tbody>'+rows.map(function(e){return '<tr><td>'+esc(e.date)+'</td><td>'+esc(e.time)+'</td><td>'+esc(e.partNum)+'</td><td>'+esc(e.machine)+'</td><td>'+e.sample+'</td><td>'+e.defects+'</td><td>'+esc(e.trace)+'</td><td>'+esc(e.cavity)+'</td><td>'+esc(e.totalMoldCavities)+'</td><td>'+esc(e.weightStatus==='Recorded'?([e.weightSpecMin,e.weightSpecMax].map(function(v){return v===null||v===''?'—':v}).join('–')+' / '+e.weightValue+' '+e.weightUnit):'N/A')+'</td><td>'+esc(e.type)+'</td><td><span class="pill '+(e.defects>0?'bad':'')+'">'+(e.defects>0?'Defect':'Pass')+'</span></td></tr>'}).join('')+'</tbody></table>';
+    return '<table class="report-table"><thead><tr>'+cols.map(function(h){return '<th>'+h+'</th>'}).join('')+'</tr></thead><tbody>'+rows.map(function(e){return '<tr><td>'+esc(e.date)+'</td><td>'+esc(e.time)+'</td><td>'+esc(e.partNum)+'</td><td>'+esc(e.machine)+'</td><td>'+e.sample+'</td><td>'+e.defects+'</td><td>'+esc(e.trace)+'</td><td>'+esc(e.cavity)+'</td><td>'+esc(e.totalMoldCavities)+'</td><td>'+esc(e.weightStatus==='Recorded'?('Spec '+[e.weightSpecMin,e.weightSpecMax].map(function(v){return v===null||v===''?'—':v}).join('–')+' '+e.weightUnit+' / '+formatInspectionWeight({weightMode:'yes',weightValue:e.weightValue,weightUnit:e.weightUnit,cavityWeights:e.cavityWeights})):'N/A')+'</td><td>'+esc(e.type)+'</td><td><span class="pill '+(e.defects>0?'bad':'')+'">'+(e.defects>0?'Defect':'Pass')+'</span></td></tr>'}).join('')+'</tbody></table>';
   }
   function renderHistory(){
     var q=(document.getElementById('historySearch').value||'').toLowerCase();var status=document.getElementById('historyResult').value;
@@ -1610,6 +1754,97 @@
     if(typeof Chart==='undefined'){document.getElementById(id).parentElement.textContent='Charts require internet access to load Chart.js.';return;}
     activeCharts[id]=new Chart(document.getElementById(id),{type:type,data:{labels:labels,datasets:datasets},options:Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type==='line'||type==='doughnut'}}},opts||{})});
   }
+  // Weight trending uses actual recorded cavity readings. It never invents observations.
+  function weightTrendReadings(){
+    var out=[];
+    allInspections.forEach(function(e){
+      if(!Array.isArray(e.cavityWeights)||!e.cavityWeights.length)return;
+      var part=String(e.partNum||e.PartNumber||'').trim(),machine=String(e.machineNum||e.ToolMachine||'').trim();
+      var unit=String(e.weightUnit||e.WeightUnit||'').trim();
+      if(!part||!machine||!unit)return;
+      var date=(e.isoDate||'').slice(0,10)||normalizeDate(e.date||e.Date);
+      var time=String(e.time||e.Time||'');
+      var min=e.weightSpecMin, max=e.weightSpecMax;
+      e.cavityWeights.forEach(function(r){
+        var cavity=cavityID(r.cavity),weight=Number(r.weight);
+        if(!cavity||!Number.isFinite(weight)||weight<0)return;
+        out.push({part:part,machine:machine,unit:unit,cavity:cavity,weight:weight,
+          min:min!==null&&min!==''&&Number.isFinite(Number(min))?Number(min):null,
+          max:max!==null&&max!==''&&Number.isFinite(Number(max))?Number(max):null,
+          date:date,time:time,id:String(e.id||''),stamp:String(e.isoDate||date+' '+time)});
+      });
+    });
+    return out.sort(function(a,b){return a.stamp.localeCompare(b.stamp)||a.cavity.localeCompare(b.cavity,undefined,{numeric:true})});
+  }
+  function trendSelectValues(id,values,preferred,firstLabel){
+    var el=document.getElementById(id);if(!el)return '';
+    var existing=el.value,chosen=values.includes(existing)?existing:(values.includes(preferred)?preferred:(values[0]||''));
+    el.replaceChildren();
+    if(!values.length){var opt=document.createElement('option');opt.value='';opt.textContent=firstLabel||'No measurements';el.appendChild(opt);return '';}
+    values.forEach(function(v){var opt=document.createElement('option');opt.value=v;opt.textContent=v;el.appendChild(opt)});
+    el.value=chosen;return chosen;
+  }
+  function weightTrendChoicesChanged(){
+    var records=weightTrendReadings();
+    var part=document.getElementById('weightTrendPart').value;
+    var machines=[...new Set(records.filter(function(r){return r.part===part}).map(function(r){return r.machine}))].sort();
+    var machine=trendSelectValues('weightTrendMachine',machines,'','No machines');
+    var units=[...new Set(records.filter(function(r){return r.part===part&&r.machine===machine}).map(function(r){return r.unit}))].sort();
+    trendSelectValues('weightTrendUnit',units,'','No units');
+    renderWeightTrend();
+  }
+  function weightTrendInitialize(){
+    var records=weightTrendReadings();
+    var parts=[...new Set(records.map(function(r){return r.part}))].sort();
+    var part=trendSelectValues('weightTrendPart',parts,'','No recorded weights');
+    var machines=[...new Set(records.filter(function(r){return r.part===part}).map(function(r){return r.machine}))].sort();
+    var machine=trendSelectValues('weightTrendMachine',machines,'','No machines');
+    var units=[...new Set(records.filter(function(r){return r.part===part&&r.machine===machine}).map(function(r){return r.unit}))].sort();
+    trendSelectValues('weightTrendUnit',units,'','No units');
+    renderWeightTrend();
+  }
+  function selectedWeightReadings(){
+    var part=document.getElementById('weightTrendPart').value,machine=document.getElementById('weightTrendMachine').value,unit=document.getElementById('weightTrendUnit').value;
+    return weightTrendReadings().filter(function(r){return r.part===part&&r.machine===machine&&r.unit===unit});
+  }
+  function renderWeightTrend(){
+    var records=selectedWeightReadings();
+    var message=document.getElementById('weightTrendMessage');
+    var picker=document.getElementById('weightTrendCavity');
+    var previous=picker.value||'all';picker.replaceChildren();
+    var allOption=document.createElement('option');allOption.value='all';allOption.textContent='All cavities';picker.appendChild(allOption);
+    var cavities=[...new Set(records.map(function(r){return r.cavity}))].sort(function(a,b){return String(a).localeCompare(String(b),undefined,{numeric:true})});
+    cavities.forEach(function(n){var opt=document.createElement('option');opt.value=String(n);opt.textContent='Cavity '+n;picker.appendChild(opt)});
+    picker.value=(previous==='all'||cavities.map(String).includes(previous))?previous:'all';
+    var chartId='weightTrendChart';
+    if(activeCharts[chartId]){activeCharts[chartId].destroy();delete activeCharts[chartId]}
+    if(!records.length){message.textContent='No saved per-cavity weight readings for this selection. Record and save weights during two or more rounds to build a trend.';return;}
+    if(typeof Chart==='undefined'){message.textContent='Chart.js could not load. Check your internet connection; the measurements remain saved locally.';return;}
+    var chosen=picker.value==='all'?cavities:cavities.filter(function(c){return String(c)===picker.value});
+    if(chosen.length>16){chosen=chosen.slice(0,16);message.textContent='Showing the first 16 cavities for readability; select an individual cavity to inspect others.';}
+    else message.textContent=records.length+' individual measurements recorded for this part/machine/unit. Each x-axis position represents one saved inspection round.';
+    // Use a stable inspection identifier; identical timestamps are kept as separate inspections.
+    var groups=new Map();records.forEach(function(r){var key=r.id||r.stamp;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r)});
+    var inspections=[...groups.values()].sort(function(a,b){return a[0].stamp.localeCompare(b[0].stamp)});
+    var labels=inspections.map(function(rs,i){return (rs[0].date||'No date')+' '+(rs[0].time||'')+' #'+(i+1)});
+    var palette=['#2563eb','#16a34a','#d97706','#a855f7','#0891b2','#dc2626','#4f46e5','#65a30d','#c026d3','#0d9488','#ea580c','#64748b','#7c3aed','#be123c','#0369a1','#3f6212'];
+    var datasets=chosen.map(function(c,i){return {label:'Cavity '+c,data:inspections.map(function(rs){var row=rs.find(function(r){return r.cavity===c});return row?row.weight:null}),borderColor:palette[i%palette.length],backgroundColor:palette[i%palette.length],spanGaps:false,tension:.2,pointRadius:4}});
+    var hasLimits=inspections.some(function(rs){return rs[0].min!==null&&rs[0].max!==null});
+    if(hasLimits){
+      datasets.push({label:'Lower Spec',data:inspections.map(function(rs){return rs[0].min}),borderColor:'#ef4444',borderDash:[6,4],pointRadius:0,tension:0,spanGaps:false});
+      datasets.push({label:'Upper Spec',data:inspections.map(function(rs){return rs[0].max}),borderColor:'#ef4444',borderDash:[6,4],pointRadius:0,tension:0,spanGaps:false});
+    }
+    activeCharts[chartId]=new Chart(document.getElementById(chartId),{type:'line',data:{labels:labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.formattedValue+' '+document.getElementById('weightTrendUnit').value}}}},scales:{y:{title:{display:true,text:'Measured weight ('+document.getElementById('weightTrendUnit').value+')'}},x:{title:{display:true,text:'Saved inspection rounds'},ticks:{maxRotation:45,minRotation:0,autoSkip:true}}}}});
+  }
+  function exportWeightTrendCSV(){
+    var records=selectedWeightReadings(),pick=document.getElementById('weightTrendCavity').value;
+    if(pick!=='all')records=records.filter(function(r){return String(r.cavity)===pick});
+    if(!records.length){alert('No weight measurements to export for this selection.');return;}
+    var rows=[['Date','Time','Part Number','Machine','Cavity','Actual Weight','Unit','Spec Minimum','Spec Maximum','Within Spec','Inspection ID']];
+    records.forEach(function(r){rows.push([r.date,r.time,r.part,r.machine,r.cavity,r.weight,r.unit,r.min??'',r.max??'',r.min===null||r.max===null?'Not evaluated':(r.weight>=r.min&&r.weight<=r.max?'Yes':'No'),r.id])});
+    var csv='\ufeff'+rows.map(function(row){return row.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"'}).join(',')}).join('\r\n');
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='QC-Weight-Trend-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  }
   function renderReports(){
     var rows=filteredRows(),parts=rows.reduce(function(s,e){return s+e.sample},0),defects=rows.reduce(function(s,e){return s+e.defects},0);
     document.getElementById('mInspections').textContent=rows.length.toLocaleString();
@@ -1624,10 +1859,11 @@
     chart('typeChart','doughnut',ty.map(function(x){return x[0]}),[{data:ty.map(function(x){return x[1]}),backgroundColor:colors}]);
     [['machineChart',ma],['cavityChart',ca]].forEach(function(g){chart(g[0],'bar',g[1].map(function(x){return x[0]}),[{data:g[1].map(function(x){return x[1]}),backgroundColor:colors}],{indexAxis:'y',plugins:{legend:{display:false}}})});
     document.getElementById('findingsTable').innerHTML=tableHTML(rows.filter(function(e){return e.defects>0||e.nc}).slice(-10).reverse());
+    weightTrendInitialize();
   }
   function exportFilteredCSV(){
-    var rows=filteredRows(),keys=['date','time','auditor','department','shift','jobNum','partNum','partName','machine','sample','defects','trace','cavity','totalMoldCavities','weightStatus','weightValue','weightUnit','weightSpecMin','weightSpecMax','type','description'];
-    var csv=[keys.join(',')].concat(rows.map(function(e){return keys.map(function(k){return '"'+String(e[k]??'').replace(/"/g,'""')+'"'}).join(',')})).join('\r\n');
+    var rows=filteredRows(),keys=['date','time','auditor','department','shift','jobNum','partNum','partName','machine','sample','defects','trace','cavity','totalMoldCavities','weightStatus','weightMethod','cavityWeights','weightValue','weightUnit','weightSpecMin','weightSpecMax','type','description'];
+    var csv=[keys.join(',')].concat(rows.map(function(e){return keys.map(function(k){return '"'+String(k==='cavityWeights'?formatInspectionWeight({weightMode:e.weightStatus==='Recorded'?'yes':'na',weightValue:e.weightValue,weightUnit:e.weightUnit,cavityWeights:e.cavityWeights}):(e[k]??'')).replace(/"/g,'""')+'"'}).join(',')})).join('\r\n');
     var blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
     a.href=url;a.download='QC-Audit-Filtered-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url)},500);
   }
@@ -1647,11 +1883,21 @@ function calImportFile(input){let f=input.files&&input.files[0];if(!f)return;if(
 function calGetTrack(id){return calTracking[id]||{location:'pending',notes:'',verified:''};}
 function calSetStatus(id,value){let t=calGetTrack(id);calTracking[id]={...t,location:value,verified:new Date().toISOString().slice(0,10)};calSave();calRender();renderMyDay();}
 function calSetNote(id,value){let t=calGetTrack(id);calTracking[id]={...t,notes:value};calSave();}
+function calQuickFilter(view){
+  // Dashboard shortcut: clear previous search/department so all matching tools appear.
+  document.getElementById('calView').value=view;
+  document.getElementById('calSearch').value='';
+  document.getElementById('calDepartment').value='';
+  calRender();
+  document.getElementById('calCount').scrollIntoView({behavior:'smooth',block:'start'});
+}
 function calRender(){let root=document.getElementById('calTools');if(!root)return;let today=calToday(),activeDue=calRecords.filter(r=>calActive(r)&&calDiff(r.due)!==null),due=activeDue.filter(r=>calDiff(r.due)>=0&&calDiff(r.due)<=60),overdue=activeDue.filter(r=>calDiff(r.due)<0),missing=calRecords.filter(r=>calGetTrack(r.id).location==='missing');document.getElementById('calTotal').textContent=calRecords.length;document.getElementById('calDue').textContent=due.length;document.getElementById('calOverdue').textContent=overdue.length;document.getElementById('calMissing').textContent=missing.length;document.getElementById('calImported').textContent=calImported?'Last import: '+calImported:'No equipment spreadsheet imported yet.';document.getElementById('calReminder').textContent=calRecords.length?`Calibration action: ${overdue.length} active equipment overdue, ${due.length} active equipment due within 60 days. Call the calibration provider, prepare the list, and locate the tools. Reminder displays when you open this app.`:'Import your IMSXpress equipment spreadsheet to start tracking calibration due dates.';
 let depts=[...new Set(calRecords.map(r=>r.department).filter(Boolean))].sort(),dept=document.getElementById('calDepartment'),selected=dept.value;dept.innerHTML='<option value="">All departments</option>'+depts.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');dept.value=depts.includes(selected)?selected:'';
-let query=document.getElementById('calSearch').value.trim().toLowerCase(),view=document.getElementById('calView').value,counts=calDuplicateCounts();let rows=calRecords.filter(r=>{let t=calGetTrack(r.id),dd=calDiff(r.due);if(dept.value&&r.department!==dept.value)return false;if(query&&![r.id,r.type,r.description,r.serial,r.department].join(' ').toLowerCase().includes(query))return false;if(view==='due'&&!(calActive(r)&&dd!==null&&dd<=60))return false;if(view==='missing'&&t.location!=='missing')return false;if(view==='located'&&t.location!=='located')return false;if(view==='duplicate'&&!(counts[(r.serial||'').trim().toUpperCase()]>1))return false;if(view==='out'&&r.status.toLowerCase()!=='out for calibration')return false;return true;}).sort((a,b)=>{let da=calDiff(a.due),db=calDiff(b.due);return (da===null?999999:da)-(db===null?999999:db)||a.id.localeCompare(b.id)});
-document.getElementById('calCount').textContent=`Showing ${Math.min(rows.length,120)} of ${rows.length} matching equipment records${rows.length>120?' — narrow the search to see more':''}.`;
-root.innerHTML=rows.slice(0,120).map(r=>{let t=calGetTrack(r.id),dd=calDiff(r.due),dueText=dd===null?'No due date':dd<0?`${-dd} days overdue`:dd===0?'Due today':`Due in ${dd} days`,tone=dd!==null&&dd<0&&calActive(r)?'danger':dd!==null&&dd<=60&&calActive(r)?'warn': 'ok';let cert=calCerts[r.id];return `<div class="cal-tool"><details><summary><div><strong>${esc(r.id)} — ${esc(r.type||r.description||'Equipment')}</strong><div class="cal-sub">${esc(r.department||'Department not listed')} · ${esc(r.due||'No due date')}</div></div><span class="cal-chip ${tone}">${esc(dueText)} ▾</span></summary><div class="cal-details"><p><strong>Tool ID</strong>${esc(r.id)}</p><p><strong>Serial Number</strong>${esc(r.serial||'Not listed')}${counts[(r.serial||'').trim().toUpperCase()]>1?' ⚠ Duplicate serial':''}</p><p><strong>Department / Location</strong>${esc(r.department||'Not listed')}</p><p><strong>Equipment Description</strong>${esc(r.description||r.type||'Not listed')}</p><p><strong>IMSXpress Status</strong>${esc(r.status||'Not listed')}</p><p><strong>Calibration Interval</strong>${esc(r.interval||'Not listed')}</p><p><strong>Last Calibration</strong>${esc(r.calDate||'Not listed')}</p><p><strong>Next Due</strong>${esc(r.due||'Not listed')}</p><p><strong>Certificate No.</strong>${esc(r.certificate||'Not listed')}</p><p><strong>Certificate Filename Date</strong>${esc(cert?cert.date+' ('+cert.file+')':'Not matched')}</p><div class="field" style="grid-column:1/-1"><label>Location Status (personal tracking)</label><select data-cal-id="${esc(r.id)}"><option value="pending" ${t.location==='pending'?'selected':''}>Not Started</option><option value="located" ${t.location==='located'?'selected':''}>Located</option><option value="missing" ${t.location==='missing'?'selected':''}>Unable to Locate</option></select></div><p><strong>Last Verified</strong>${esc(t.verified||'Not recorded')}</p></div></details><div class="cal-notes"><label>Notes / Exact Location</label><input data-note-id="${esc(r.id)}" value="${esc(t.notes||'')}" placeholder="e.g. Next to restroom in SMC" aria-label="Notes for ${esc(r.id)}"></div></div>`}).join('')||'<p class="field-hint">No matching tools. Import Excel or select another filter.</p>';
+let query=document.getElementById('calSearch').value.trim().toLowerCase(),view=document.getElementById('calView').value,counts=calDuplicateCounts();let rows=calRecords.filter(r=>{let t=calGetTrack(r.id),dd=calDiff(r.due);if(dept.value&&r.department!==dept.value)return false;if(query&&![r.id,r.type,r.description,r.serial,r.department].join(' ').toLowerCase().includes(query))return false;if(view==='due'&&!(calActive(r)&&dd!==null&&dd>=0&&dd<=60))return false;if(view==='overdue'&&!(calActive(r)&&dd!==null&&dd<0))return false;if(view==='missing'&&t.location!=='missing')return false;if(view==='located'&&t.location!=='located')return false;if(view==='duplicate'&&!(counts[(r.serial||'').trim().toUpperCase()]>1))return false;if(view==='out'&&r.status.toLowerCase()!=='out for calibration')return false;return true;}).sort((a,b)=>{let da=calDiff(a.due),db=calDiff(b.due);return (da===null?999999:da)-(db===null?999999:db)||a.id.localeCompare(b.id)});
+document.querySelectorAll('[data-cal-filter]').forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.calFilter===view)));
+let viewLabel=document.getElementById('calView').selectedOptions[0]?.textContent||'Equipment';
+document.getElementById('calCount').textContent=`${viewLabel}: showing ${Math.min(rows.length,120)} of ${rows.length} matching tool(s)${rows.length>120?' — narrow the search to see more':''}.`;
+root.innerHTML=rows.slice(0,120).map(r=>{let t=calGetTrack(r.id),dd=calDiff(r.due),dueText=dd===null?'No due date':dd<0?`${-dd} days overdue`:dd===0?'Due today':`Due in ${dd} days`,tone=dd!==null&&dd<0&&calActive(r)?'danger':dd!==null&&dd<=60&&calActive(r)?'warn': 'ok';let cert=calCerts[r.id];return `<div class="cal-tool"><details><summary><div><strong>${esc(r.id)} — ${esc(r.type||r.description||'Equipment')}</strong><div class="cal-sub">${esc(r.department||'Department not listed')} · ${esc(r.due||'No due date')} · ${esc(r.status||'Status not listed')}</div></div><span class="cal-chip ${tone}">${esc(dueText)} ▾</span></summary><div class="cal-details"><p><strong>Tool ID</strong>${esc(r.id)}</p><p><strong>Serial Number</strong>${esc(r.serial||'Not listed')}${counts[(r.serial||'').trim().toUpperCase()]>1?' ⚠ Duplicate serial':''}</p><p><strong>Department / Location</strong>${esc(r.department||'Not listed')}</p><p><strong>Equipment Description</strong>${esc(r.description||r.type||'Not listed')}</p><p><strong>IMSXpress Status</strong>${esc(r.status||'Not listed')}</p><p><strong>Calibration Interval</strong>${esc(r.interval||'Not listed')}</p><p><strong>Last Calibration</strong>${esc(r.calDate||'Not listed')}</p><p><strong>Next Due</strong>${esc(r.due||'Not listed')}</p><p><strong>Certificate No.</strong>${esc(r.certificate||'Not listed')}</p><p><strong>Certificate Filename Date</strong>${esc(cert?cert.date+' ('+cert.file+')':'Not matched')}</p><div class="field" style="grid-column:1/-1"><label>Location Status (personal tracking)</label><select data-cal-id="${esc(r.id)}"><option value="pending" ${t.location==='pending'?'selected':''}>Not Started</option><option value="located" ${t.location==='located'?'selected':''}>Located</option><option value="missing" ${t.location==='missing'?'selected':''}>Unable to Locate</option></select></div><p><strong>Last Verified</strong>${esc(t.verified||'Not recorded')}</p></div></details><div class="cal-notes"><label>Notes / Exact Location</label><input data-note-id="${esc(r.id)}" value="${esc(t.notes||'')}" placeholder="e.g. Next to restroom in SMC" aria-label="Notes for ${esc(r.id)}"></div></div>`}).join('')||'<p class="field-hint">No matching tools. Import Excel or select another filter.</p>';
 root.querySelectorAll('select[data-cal-id]').forEach(el=>el.addEventListener('change',function(){calSetStatus(this.dataset.calId,this.value)}));root.querySelectorAll('input[data-note-id]').forEach(el=>el.addEventListener('change',function(){calSetNote(this.dataset.noteId,this.value)}));}
 function calCSV(rows,name){let cols=['Tool ID','Equipment','Description','Serial Number','Department','IMSXpress Status','Calibration Interval','Last Calibration','Due Date','Days Remaining','Location Status','Notes','Last Verified','Certificate File','Certificate Date'];let csv=[cols,...rows.map(r=>{let t=calGetTrack(r.id),c=calCerts[r.id]||{};return [r.id,r.type,r.description,r.serial,r.department,r.status,r.interval,r.calDate,r.due,calDiff(r.due)??'',t.location,t.notes,t.verified,c.file||'',c.date||''];})].map(row=>row.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');let blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500);}
 function calExportVisit(){let rows=calRecords.filter(r=>calActive(r)&&calDiff(r.due)!==null&&calDiff(r.due)<=60);if(!rows.length){alert('No active tools due within 60 days (or no spreadsheet imported).');return;}calCSV(rows,'Calibration-Visit-List-'+new Date().toISOString().slice(0,10)+'.csv');}
@@ -1685,7 +1931,17 @@ function projectImport(input){let f=input.files?.[0];if(!f)return;if(!window.XLS
 function projectDownload(content,name,type){let b=new Blob([content],{type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),500)}
 function projectExport(){let cols=[['Action Item','name'],['Category','category'],['Priority','priority'],['Owner','owner'],['Date Assigned','assigned'],['Due Date','due'],['Status','status'],['Follow-up Date','followup'],['Waiting On','waitingOn'],['Next Action','next'],['Date Closed','closed'],['Notes','notes']];let csv=[cols.map(x=>x[0]),...projectRows.map(p=>cols.map(x=>p[x[1]]||''))].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');projectDownload('\ufeff'+csv,'QC-Projects-Report-'+projectToday()+'.csv','text/csv;charset=utf-8')}
 function projectBackup(){projectDownload(JSON.stringify({version:1,exported:new Date().toISOString(),projects:projectRows},null,2),'QC-Projects-Backup-'+projectToday()+'.json','application/json')}
-function renderMyDay(){let root=document.getElementById('dayMessages');if(!root)return;let open=projectRows.filter(p=>!projectDone(p)),overdue=open.filter(projectOverdue),follows=open.filter(projectFollowup),urgent=open.filter(p=>p.priority==='High'),actives=calRecords.filter(r=>calActive(r)),calDue=actives.filter(r=>calDiff(r.due)!==null&&calDiff(r.due)<=60),notFound=calRecords.filter(r=>calGetTrack(r.id).location==='missing');document.getElementById('dayOpen').textContent=open.length;document.getElementById('dayOverdue').textContent=overdue.length;document.getElementById('dayFollowups').textContent=follows.length;document.getElementById('dayCalibration').textContent=calDue.length;let alerts=[];if(overdue.length)alerts.push(`<div class="work-callout">⚠ <strong>${overdue.length} overdue project(s).</strong> Review deadlines and update next actions.</div>`);if(follows.length)alerts.push(`<div class="work-callout">📅 <strong>${follows.length} follow-up(s) due.</strong> Contact the person you are waiting on or update your progress.</div>`);if(calDue.length)alerts.push(`<div class="work-callout">🛠 <strong>${calDue.length} active calibration(s) due or overdue within 60 days.</strong> Contact the calibration company and prepare a visit list.</div>`);if(notFound.length)alerts.push(`<div class="work-callout">🔎 <strong>${notFound.length} equipment item(s) marked Unable to Locate.</strong> Review search notes.</div>`);let next=open.slice().sort((a,b)=>Number(projectOverdue(b))-Number(projectOverdue(a))||Number(projectFollowup(b))-Number(projectFollowup(a))||projectPriority(a)-projectPriority(b)||(a.due||'9999').localeCompare(b.due||'9999')).slice(0,6);if(next.length)alerts.push('<div class="work-section-head">Your next actions</div>'+next.map(p=>`<div class="work-card"><h3>${esc(p.name)}</h3><div class="work-meta">${esc(p.priority||'Medium')} priority · ${esc(p.status||'Not Started')} · Due: ${esc(p.due||'Not set')}</div><p>${esc(p.next||'Define your next action in My Projects.')}</p>${p.waitingOn?`<p>Waiting on: ${esc(p.waitingOn)}</p>`:''}</div>`).join(''));if(!alerts.length)alerts.push('<div class="work-empty">No priorities loaded yet. Add your work projects and import your approved IMSXpress equipment list to activate reminders.</div>');root.innerHTML=alerts.join('')}
+// ISO/QMS reference prompts; not an interpretation of every ISO requirement.
+const QMS_GUIDE=[
+  {ref:'ISO 9001:2015 §7.1.5',title:'Review calibration readiness',action:'Check current equipment status in IMSXpress, review due dates and locate equipment for the next scheduled calibration visit.',kind:'Calibration'},
+  {ref:'ISO 9001:2015 §7.5',title:'Review controlled work instructions',action:'Confirm the current approved SOP or work instruction is accessible and being followed. Escalate outdated documents through the company document-control process.',kind:'SOP / Document Control'},
+  {ref:'ISO 9001:2015 §8.5.1 / §9.1',title:'Review inspection and measurement records',action:'Verify the applicable Spec Sheet, correct sampling method, individual cavity weights when required, and that records were saved/exported.',kind:'Inspection'},
+  {ref:'ISO 9001:2015 §8.7 / §10.2',title:'Follow up nonconforming output',action:'Review open nonconformities, containment and assigned follow-ups. Official disposition or corrective-action approval remains in the authorized company process.',kind:'Nonconformance'}
+];
+function qmsSaveEdition(){try{localStorage.setItem('qc_qms_edition',document.getElementById('qmsEdition').value)}catch(e){alert('Could not save your QMS edition in this browser.')}}
+function qmsCreateTask(n){var item=QMS_GUIDE[n];if(!item)return;showTab('projects');projectNew();document.getElementById('prjName').value=item.title;document.getElementById('prjCategory').value='QMS - '+item.kind;document.getElementById('prjNext').value=item.action;document.getElementById('prjNotes').value='Reference: '+item.ref+' (2015 reference, verify current approved ISO edition and company SOP).';document.getElementById('prjStatus').value='Not Started';document.getElementById('prjPriority').value='Medium';document.getElementById('projectEditor').scrollIntoView({behavior:'smooth',block:'start'});}
+function qmsGuideRender(){var root=document.getElementById('qmsGuide');if(!root)return;try{document.getElementById('qmsEdition').value=localStorage.getItem('qc_qms_edition')||'Unconfirmed'}catch(e){}root.innerHTML=QMS_GUIDE.map((item,i)=>'<div class="work-card"><div class="work-card-head"><div><h3>'+esc(item.title)+'</h3><div class="work-meta">Reference: '+esc(item.ref)+'</div></div></div><p>'+esc(item.action)+'</p><div class="work-inline"><button type="button" class="btn btn-secondary" onclick="qmsCreateTask('+i+')">＋ Make follow-up task</button></div></div>').join('');}
+function renderMyDay(){qmsGuideRender();let root=document.getElementById('dayMessages');if(!root)return;let open=projectRows.filter(p=>!projectDone(p)),overdue=open.filter(projectOverdue),follows=open.filter(projectFollowup),urgent=open.filter(p=>p.priority==='High'),actives=calRecords.filter(r=>calActive(r)),calDue=actives.filter(r=>calDiff(r.due)!==null&&calDiff(r.due)<=60),notFound=calRecords.filter(r=>calGetTrack(r.id).location==='missing');document.getElementById('dayOpen').textContent=open.length;document.getElementById('dayOverdue').textContent=overdue.length;document.getElementById('dayFollowups').textContent=follows.length;document.getElementById('dayCalibration').textContent=calDue.length;let alerts=[];if(overdue.length)alerts.push(`<div class="work-callout">⚠ <strong>${overdue.length} overdue project(s).</strong> Review deadlines and update next actions.</div>`);if(follows.length)alerts.push(`<div class="work-callout">📅 <strong>${follows.length} follow-up(s) due.</strong> Contact the person you are waiting on or update your progress.</div>`);if(calDue.length)alerts.push(`<div class="work-callout">🛠 <strong>${calDue.length} active calibration(s) due or overdue within 60 days.</strong> Contact the calibration company and prepare a visit list.</div>`);if(notFound.length)alerts.push(`<div class="work-callout">🔎 <strong>${notFound.length} equipment item(s) marked Unable to Locate.</strong> Review search notes.</div>`);let next=open.slice().sort((a,b)=>Number(projectOverdue(b))-Number(projectOverdue(a))||Number(projectFollowup(b))-Number(projectFollowup(a))||projectPriority(a)-projectPriority(b)||(a.due||'9999').localeCompare(b.due||'9999')).slice(0,6);if(next.length)alerts.push('<div class="work-section-head">Your next actions</div>'+next.map(p=>`<div class="work-card"><h3>${esc(p.name)}</h3><div class="work-meta">${esc(p.priority||'Medium')} priority · ${esc(p.status||'Not Started')} · Due: ${esc(p.due||'Not set')}</div><p>${esc(p.next||'Define your next action in My Projects.')}</p>${p.waitingOn?`<p>Waiting on: ${esc(p.waitingOn)}</p>`:''}</div>`).join(''));if(!alerts.length)alerts.push('<div class="work-empty">No priorities loaded yet. Add your work projects and import your approved IMSXpress equipment list to activate reminders.</div>');root.innerHTML=alerts.join('')}
 projectLoad();
 
   // ── INIT ──────────────────────────────────────────────────────────
